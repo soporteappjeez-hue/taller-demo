@@ -589,7 +589,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
                       </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => borrarPaquete(p.id)}
-                        className="w-9 h-9 rounded-full bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-colors"
+                        className="w-9 h-9 rounded-full bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
                         title="Borrar captura">
                         <Trash2 className="w-4 h-4" />
                       </button>
