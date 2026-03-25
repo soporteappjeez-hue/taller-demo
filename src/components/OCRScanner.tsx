@@ -213,10 +213,26 @@ function detectLocalidadFromText(text: string): string | null {
 }
 
 // Extraer el ID de envío ML — número de 10-13 dígitos que no sea un CP (4 dígitos)
-function extractEnvioId(text: string): string | null {
-  const matches = text.match(/\b(\d{10,13})\b/g);
+function extractEnvioId(rawText: string): string | null {
+  // Paso 1: normalizar — quitar espacios ENTRE dígitos consecutivos
+  // "4 6 7 1 5 6 2 2 5 6 2" → "46715622562"
+  // Se aplica varias veces hasta que no haya más cambios
+  let text = rawText;
+  let prev = "";
+  while (prev !== text) {
+    prev = text;
+    text = text.replace(/(\d) (\d)/g, "$1$2");
+  }
+
+  // Paso 2: buscar secuencias de 10-13 dígitos seguidos (sin letras alrededor)
+  const matches = text.match(/(?<![A-Za-z0-9])(\d{10,13})(?![A-Za-z0-9])/g);
   if (!matches) return null;
-  // Preferir el más largo (IDs de ML suelen tener 11 dígitos)
+
+  // Paso 3: preferir exactamente 11 dígitos (formato estándar ML Flex)
+  const once = matches.filter(m => m.length === 11);
+  if (once.length > 0) return once[0];
+
+  // Si no hay de 11, devolver el más largo disponible
   return matches.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
