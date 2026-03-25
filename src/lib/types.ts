@@ -134,6 +134,22 @@ export interface AgendaCliente {
   createdAt: string;
 }
 
+export interface HistorialReparacion {
+  id: string;
+  clienteId: string;
+  ordenId: string | null;
+  fechaIngreso: string;
+  motorType: string;
+  brand: string;
+  model: string;
+  falla: string;
+  trabajo: string;
+  presupuesto: number | null;
+  estadoFinal: string;
+  photoUrls: string[];
+  createdAt: string;
+}
+
 export const PART_ORDER_STATUS_LABELS: Record<
   PartToOrder["status"],
   string

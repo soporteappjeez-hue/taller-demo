@@ -10,7 +10,7 @@ import { generateId } from "@/lib/utils";
 import { exportOrdersToExcel } from "@/lib/exportExcel";
 import { exportOrdersReportPDF } from "@/lib/exportPDF";
 import { clearSentLog } from "@/lib/notifications";
-import { agendaDb } from "@/lib/db";
+import { agendaDb, historialDb } from "@/lib/db";
 import Navbar from "@/components/Navbar";
 import FiltersBar from "@/components/FiltersBar";
 import OrderCard from "@/components/OrderCard";
@@ -74,13 +74,22 @@ export default function DashboardPage() {
     try {
       if (editingOrder) {
         await update(order.id, order);
-        // Mantener agenda sincronizada si cambió nombre o teléfono
-        agendaDb.upsertByPhone(order.clientName, order.clientPhone).catch(() => {});
+        // Sincronizar agenda y actualizar copia en historial
+        agendaDb.upsertByPhone(order.clientName, order.clientPhone).then(async () => {
+          const clientes = await agendaDb.getAll();
+          const cliente = clientes.find(c => c.telefono === order.clientPhone.trim());
+          if (cliente) historialDb.upsert(cliente.id, order).catch(() => {});
+        }).catch(() => {});
         showToast("Orden actualizada con éxito");
       } else {
         const newOrder = { ...order, id: generateId(), entryDate: new Date().toISOString() };
         await create(newOrder);
-        agendaDb.upsertByPhone(newOrder.clientName, newOrder.clientPhone).catch(() => {});
+        // Registrar en agenda y guardar copia permanente en historial
+        agendaDb.upsertByPhone(newOrder.clientName, newOrder.clientPhone).then(async () => {
+          const clientes = await agendaDb.getAll();
+          const cliente = clientes.find(c => c.telefono === newOrder.clientPhone.trim());
+          if (cliente) historialDb.upsert(cliente.id, newOrder).catch(() => {});
+        }).catch(() => {});
         showToast("¡Orden guardada con éxito!");
       }
       setShowForm(false);

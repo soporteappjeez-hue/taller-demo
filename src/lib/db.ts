@@ -3,7 +3,7 @@
 // ============================================================
 
 import { supabase } from "./supabase";
-import { WorkOrder, StockItem, PartToOrder, Pago, PlantillaWhatsApp, AgendaCliente } from "./types";
+import { WorkOrder, StockItem, PartToOrder, Pago, PlantillaWhatsApp, AgendaCliente, HistorialReparacion } from "./types";
 
 // ─── Helpers de mapeo (snake_case DB ↔ camelCase app) ────────
 
@@ -368,6 +368,56 @@ export const agendaDb = {
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from("agenda_clientes").delete().eq("id", id);
+    if (error) throw error;
+  },
+};
+
+// ─── Historial permanente de reparaciones ─────────────────────
+
+export const historialDb = {
+  async getByCliente(clienteId: string): Promise<HistorialReparacion[]> {
+    const { data, error } = await supabase
+      .from("historial_reparaciones")
+      .select("*")
+      .eq("cliente_id", clienteId)
+      .order("fecha_ingreso", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(r => ({
+      id:           r.id as string,
+      clienteId:    r.cliente_id as string,
+      ordenId:      r.orden_id as string | null,
+      fechaIngreso: r.fecha_ingreso as string,
+      motorType:    r.motor_type as string,
+      brand:        r.brand as string,
+      model:        r.model as string,
+      falla:        r.falla as string,
+      trabajo:      r.trabajo as string,
+      presupuesto:  r.presupuesto as number | null,
+      estadoFinal:  r.estado_final as string,
+      photoUrls:    (r.photo_urls as string[]) ?? [],
+      createdAt:    r.created_at as string,
+    }));
+  },
+
+  async upsert(clienteId: string, order: WorkOrder): Promise<void> {
+    const record = {
+      id:            order.id + "_hist",
+      cliente_id:    clienteId,
+      orden_id:      order.id,
+      fecha_ingreso: order.entryDate,
+      motor_type:    order.motorType,
+      brand:         order.brand,
+      model:         order.model,
+      falla:         order.reportedIssues,
+      trabajo:       order.internalNotes ?? "",
+      presupuesto:   order.budget,
+      estado_final:  order.status,
+      photo_urls:    order.photoUrls ?? [],
+      updated_at:    new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from("historial_reparaciones")
+      .upsert(record, { onConflict: "id" });
     if (error) throw error;
   },
 };

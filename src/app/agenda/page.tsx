@@ -1,24 +1,24 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { AgendaCliente, WorkOrder, REPAIR_STATUS_LABELS, REPAIR_STATUS_COLORS } from "@/lib/types";
-import { agendaDb, ordersDb } from "@/lib/db";
+import { AgendaCliente, HistorialReparacion } from "@/lib/types";
+import { agendaDb, historialDb } from "@/lib/db";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import {
-  Users, Search, Phone, ChevronRight, X, Clock,
-  Wrench, Trash2, Camera, DollarSign, Calendar,
-  AlertTriangle, ChevronDown, ChevronUp, RefreshCw,
+  Users, Search, Phone, ChevronRight, X,
+  Wrench, Trash2, Camera, Calendar,
+  ChevronDown, ChevronUp, RefreshCw,
 } from "lucide-react";
 
 // ─── Línea de tiempo de un cliente ──────────────────────────────
 
-function Timeline({ orders }: { orders: WorkOrder[] }) {
+function Timeline({ items }: { items: HistorialReparacion[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
-  if (orders.length === 0) return (
+  if (items.length === 0) return (
     <div className="flex flex-col items-center py-10 text-gray-500">
       <Wrench className="w-10 h-10 mb-2 opacity-30" />
       <p className="text-sm">No hay reparaciones registradas</p>
@@ -27,21 +27,14 @@ function Timeline({ orders }: { orders: WorkOrder[] }) {
 
   return (
     <ol className="relative border-l-2 border-orange-500/30 ml-4 space-y-0">
-      {orders.map((o, idx) => {
+      {items.map((o, idx) => {
         const isOpen = expanded[o.id];
         return (
           <li key={o.id} className="mb-0 ml-6">
-            {/* Dot */}
             <span className={`absolute -left-[9px] flex items-center justify-center w-4 h-4 rounded-full border-2
-              ${idx === 0 ? "bg-orange-500 border-orange-400" : "bg-gray-700 border-gray-500"}`}
-            />
-
-            <div className="card mb-4 ml-0">
-              {/* Header de la visita */}
-              <button
-                className="w-full text-left"
-                onClick={() => toggle(o.id)}
-              >
+              ${idx === 0 ? "bg-orange-500 border-orange-400" : "bg-gray-700 border-gray-500"}`} />
+            <div className="card mb-4">
+              <button className="w-full text-left" onClick={() => toggle(o.id)}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap gap-1.5 mb-1">
@@ -51,57 +44,43 @@ function Timeline({ orders }: { orders: WorkOrder[] }) {
                           : "bg-orange-500/20 text-orange-300 border-orange-500/40"}`}>
                         {o.motorType}
                       </span>
-                      <span className={`badge ${REPAIR_STATUS_COLORS[o.status]}`}>
-                        {REPAIR_STATUS_LABELS[o.status]}
-                      </span>
                       {idx === 0 && (
                         <span className="badge bg-orange-900/40 text-orange-300 border-orange-600">
                           Última visita
                         </span>
                       )}
                     </div>
-                    <p className="text-white font-bold">
-                      {o.brand} {o.model}
-                    </p>
+                    <p className="text-white font-bold">{o.brand} {o.model}</p>
                     <p className="text-gray-500 text-xs flex items-center gap-1 mt-0.5">
-                      <Calendar className="w-3 h-3" /> {formatDate(o.entryDate)}
+                      <Calendar className="w-3 h-3" /> {formatDate(o.fechaIngreso)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {o.budget !== null && (
+                    {o.presupuesto !== null && (
                       <span className="text-green-400 font-bold text-sm">
-                        {formatCurrency(o.budget)}
+                        {formatCurrency(o.presupuesto)}
                       </span>
                     )}
-                    {isOpen
-                      ? <ChevronUp className="w-4 h-4 text-gray-500" />
-                      : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
                   </div>
                 </div>
               </button>
 
-              {/* Detalle expandible */}
               {isOpen && (
                 <div className="mt-3 pt-3 border-t border-gray-700/60 space-y-3">
-                  {/* Falla */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                      Falla reportada
-                    </p>
-                    <p className="text-gray-300 text-sm leading-relaxed">{o.reportedIssues}</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Falla reportada</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{o.falla}</p>
                   </div>
-
-                  {/* Notas internas */}
-                  {o.internalNotes && (
+                  {o.trabajo && (
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                        Trabajo realizado / Notas
-                      </p>
-                      <p className="text-gray-300 text-sm leading-relaxed">{o.internalNotes}</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Trabajo realizado</p>
+                      <p className="text-gray-300 text-sm leading-relaxed">{o.trabajo}</p>
                     </div>
                   )}
-
-                  {/* Fotos */}
+                  {o.estadoFinal && (
+                    <p className="text-xs text-gray-500">Estado: <span className="text-gray-300">{o.estadoFinal}</span></p>
+                  )}
                   {(o.photoUrls?.length ?? 0) > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
@@ -110,26 +89,13 @@ function Timeline({ orders }: { orders: WorkOrder[] }) {
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {o.photoUrls.map((url, i) => (
                           <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={url}
-                              alt={`Foto ${i + 1}`}
-                              className="h-20 w-20 object-cover rounded-xl border border-gray-600 flex-shrink-0 hover:border-orange-400 transition-colors"
-                            />
+                            <img src={url} alt={`Foto ${i + 1}`}
+                              className="h-20 w-20 object-cover rounded-xl border border-gray-600 flex-shrink-0 hover:border-orange-400 transition-colors" />
                           </a>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* Fechas */}
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                    {o.completionDate && (
-                      <span>✓ Listo: <span className="text-gray-300">{formatDate(o.completionDate)}</span></span>
-                    )}
-                    {o.deliveryDate && (
-                      <span>📦 Entregado: <span className="text-gray-300">{formatDate(o.deliveryDate)}</span></span>
-                    )}
-                  </div>
                 </div>
               )}
             </div>
@@ -143,37 +109,27 @@ function Timeline({ orders }: { orders: WorkOrder[] }) {
 // ─── Modal ficha de cliente ──────────────────────────────────────
 
 function ClienteModal({ cliente, onClose }: { cliente: AgendaCliente; onClose: () => void }) {
-  const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [items, setItems] = useState<HistorialReparacion[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    ordersDb.getAll().then(all => {
-      const found = all
-        .filter(o => o.clientPhone === cliente.telefono)
-        .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-      setOrders(found);
+    historialDb.getByCliente(cliente.id).then(data => {
+      setItems(data);
       setLoading(false);
-    });
-  }, [cliente.telefono]);
+    }).catch(() => setLoading(false));
+  }, [cliente.id]);
 
-  // Equipos únicos
   const equipos = useMemo(() => {
     const map = new Map<string, { brand: string; model: string; type: string; count: number }>();
-    orders.forEach(o => {
+    items.forEach(o => {
       const key = `${o.brand}|${o.model}|${o.motorType}`;
-      const existing = map.get(key);
-      if (existing) existing.count++;
-      else map.set(key, { brand: o.brand, model: o.model, type: o.motorType, count: 1 });
+      const e = map.get(key);
+      if (e) e.count++; else map.set(key, { brand: o.brand, model: o.model, type: o.motorType, count: 1 });
     });
     return Array.from(map.values());
-  }, [orders]);
+  }, [items]);
 
-  const totalFacturado = orders.reduce((s, o) => s + (o.budget ?? 0), 0);
-  const overdue90 = orders.filter(o => {
-    if (o.status !== "listo_para_retiro" || !o.completionDate) return false;
-    const days = Math.floor((Date.now() - new Date(o.completionDate).getTime()) / 86400000);
-    return days >= 90;
-  }).length;
+  const totalFacturado = items.reduce((s, o) => s + (o.presupuesto ?? 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -203,48 +159,28 @@ function ClienteModal({ cliente, onClose }: { cliente: AgendaCliente; onClose: (
         </div>
 
         {/* Stats */}
-        {!loading && orders.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 px-5 pt-4">
+        {!loading && items.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 px-5 pt-4">
             <div className="card py-3 text-center">
-              <p className="text-2xl font-black text-orange-400">{orders.length}</p>
+              <p className="text-2xl font-black text-orange-400">{items.length}</p>
               <p className="text-xs text-gray-500">Visitas</p>
             </div>
             <div className="card py-3 text-center">
               <p className="text-2xl font-black text-green-400">{formatCurrency(totalFacturado)}</p>
-              <p className="text-xs text-gray-500">Total</p>
-            </div>
-            <div className={`card py-3 text-center ${overdue90 > 0 ? "border-red-600" : ""}`}>
-              <p className={`text-2xl font-black ${overdue90 > 0 ? "text-red-400" : "text-gray-400"}`}>
-                {equipos.length}
-              </p>
-              <p className="text-xs text-gray-500">Equipos</p>
+              <p className="text-xs text-gray-500">Total facturado</p>
             </div>
           </div>
         )}
 
-        {/* Alerta 90 días */}
-        {overdue90 > 0 && (
-          <div className="mx-5 mt-3 flex items-center gap-2 bg-red-900/30 border border-red-600/50 rounded-xl px-3 py-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <p className="text-red-300 text-xs font-semibold">
-              {overdue90} equipo{overdue90 > 1 ? "s" : ""} con más de 90 días esperando retiro
-            </p>
-          </div>
-        )}
-
-        {/* Equipos que trajo */}
+        {/* Equipos */}
         {equipos.length > 0 && (
           <div className="px-5 pt-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Equipos registrados
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Equipos registrados</p>
             <div className="flex flex-wrap gap-2">
               {equipos.map((eq, i) => (
                 <div key={i} className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2">
                   <p className="text-white text-sm font-semibold">{eq.brand} {eq.model}</p>
-                  <p className="text-gray-500 text-xs">
-                    {eq.type === "2T" ? "2 Tiempos" : "4 Tiempos"} · {eq.count} ingreso{eq.count !== 1 ? "s" : ""}
-                  </p>
+                  <p className="text-gray-500 text-xs">{eq.type === "2T" ? "2 Tiempos" : "4 Tiempos"} · {eq.count} ingreso{eq.count !== 1 ? "s" : ""}</p>
                 </div>
               ))}
             </div>
@@ -259,12 +195,12 @@ function ClienteModal({ cliente, onClose }: { cliente: AgendaCliente; onClose: (
             </div>
           ) : (
             <>
-              {orders.length > 0 && (
+              {items.length > 0 && (
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-                  Línea de tiempo — {orders.length} visita{orders.length !== 1 ? "s" : ""}
+                  Historial permanente — {items.length} visita{items.length !== 1 ? "s" : ""}
                 </p>
               )}
-              <Timeline orders={orders} />
+              <Timeline items={items} />
             </>
           )}
         </div>
