@@ -72,7 +72,7 @@ function beepError() {
 const CP_MAP: Record<string, string> = {
   "1804": "Ezeiza",
   "1842": "Esteban Echeverría",
-  "1759": "La Matanza Sur", "1761": "La Matanza Sur",
+  "1759": "La Matanza Sur", "1761": "La Matanza Sur", "1763": "La Matanza Sur",
   "1870": "Avellaneda",
   "1824": "Lanús",
   "1832": "Lomas de Zamora",
