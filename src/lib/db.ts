@@ -535,10 +535,11 @@ export const clientesFlexDb = {
     nombre: string,
     producto: string,
     localidad: string,
+    productoNombre?: string,
+    direccion?: string,
   ): Promise<FidelAlerta | null> {
     if (!usuarioML) return null;
     try {
-      // Guardar fase anterior para detectar si subió
       const { data: prevData } = await supabase
         .from("clientes_flex")
         .select("fase, total_compras")
@@ -546,18 +547,23 @@ export const clientesFlexDb = {
         .maybeSingle();
       const fasePrev = (prevData?.fase as FidelFase) ?? "bronce";
 
-      // Upsert via función SQL
       const { data, error } = await supabase.rpc("upsert_cliente_flex", {
         p_usuario_ml:       usuarioML,
         p_nombre:           nombre,
-        p_ultimo_producto:  producto,
+        p_ultimo_producto:  productoNombre || producto,
         p_ultima_localidad: localidad,
       });
       if (error || !data || data.length === 0) return null;
 
-      const row = data[0] as { total_compras: number; compras_este_mes: number; fase: string };
+      const row        = data[0] as { total_compras: number; compras_este_mes: number; fase: string };
       const faseActual = row.fase as FidelFase;
       const esNuevoNivel = faseActual !== fasePrev;
+      const regalo     = sugerirRegalo(productoNombre || producto);
+
+      const fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+      const prodDisplay = productoNombre || producto || "Sin producto";
+      const faseLabel_  = faseActual === "oro" ? "ORO" : faseActual === "plata" ? "PLATA" : "BRONCE";
+      const lineaSupabase = `${fecha} | ${usuarioML} | ${direccion || localidad} | ${prodDisplay} | ${faseLabel_} | ${regalo}`;
 
       return {
         usuarioML,
@@ -566,8 +572,11 @@ export const clientesFlexDb = {
         comprasEsteMes:  row.compras_este_mes,
         fase:            faseActual,
         esNuevoNivel,
-        regalSugerido:   sugerirRegalo(producto),
+        regalSugerido:   regalo,
         ultimoProducto:  producto,
+        productoNombre:  productoNombre || producto,
+        direccion:       direccion || "",
+        lineaSupabase,
       };
     } catch (_) { return null; }
   },

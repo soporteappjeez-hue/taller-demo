@@ -248,11 +248,27 @@ function extractEtiquetaData(rawText: string): EtiquetaData {
   const cpMatch = text.match(/[Cc][Pp]\s*:?\s*(\d{4})/);
   const codigoPostal = cpMatch ? cpMatch[1] : null;
 
-  // ── SKU: después de "SKU:" ──
+  // ── Producto: línea que contiene "Producto:" o "Artículo:" o "Descripción:" ──
+  // También intenta leer la línea con palabras clave de productos MAQJEEZ
+  const prodPatterns = [
+    /[Pp]roducto\s*:?\s*(.+?)(?:\n|$)/,
+    /[Aa]rt[ií]culo\s*:?\s*(.+?)(?:\n|$)/,
+    /[Dd]escripci[oó]n\s*:?\s*(.+?)(?:\n|$)/,
+    /[Cc]ontenido\s*:?\s*(.+?)(?:\n|$)/,
+    // Línea que contiene palabras de repuestos comunes
+    /([A-Za-záéíóúÁÉÍÓÚñÑ ]{4,50}(?:carburador|cilindro|pist[oó]n|cabezal|cuchilla|cadena|arn[eé]s|buj[ií]a|filtro|brida|tanza|aceite|kit|repuesto|pieza|parte)[A-Za-z0-9áéíóúÁÉÍÓÚñÑ ]{0,30})/i,
+  ];
+  let productoNombre: string | null = null;
+  for (const pat of prodPatterns) {
+    const m = text.match(pat);
+    if (m) { productoNombre = m[1].trim().slice(0, 80); break; }
+  }
+
+  // ── SKU: después de "SKU:" (código corto tipo MAQJEEZ-00179) ──
   const skuMatch = text.match(/[Ss][Kk][Uu]\s*:?\s*([A-Z0-9\-]{4,30})/);
   const productoSku = skuMatch ? skuMatch[1].trim() : null;
 
-  return { envioId, packId, usuarioML, nombreDestinatario, direccion, codigoPostal, productoSku };
+  return { envioId, packId, usuarioML, nombreDestinatario, direccion, codigoPostal, productoSku, productoNombre };
 }
 
 interface QRParsed { envioId: string | null; usuarioML: string | null; }
@@ -333,13 +349,14 @@ function preprocessCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 export interface EtiquetaData {
-  envioId:            string | null; // "Envío: 46719267146"
-  packId:             string | null; // "Pack ID: 200012198133809"
-  usuarioML:          string | null; // "(ADOLFORECO)"
-  nombreDestinatario: string | null; // "Adolfo Enrique Recobski"
-  direccion:          string | null; // "Calle C Castro 729"
-  codigoPostal:       string | null; // "1682"
-  productoSku:        string | null; // "SKU: MAQJEEZ-00179"
+  envioId:            string | null;
+  packId:             string | null;
+  usuarioML:          string | null;
+  nombreDestinatario: string | null;
+  direccion:          string | null;
+  codigoPostal:       string | null;
+  productoSku:        string | null;
+  productoNombre:     string | null; // nombre completo del producto
 }
 
 export interface PaqueteOCR {
@@ -357,6 +374,7 @@ export interface PaqueteOCR {
   direccion:          string | null;
   codigoPostal:       string | null;
   productoSku:        string | null;
+  productoNombre:     string | null;
   estado: "ok";
 }
 
@@ -568,6 +586,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
       direccion:          liveEtiqueta?.direccion ?? null,
       codigoPostal:       liveEtiqueta?.codigoPostal ?? null,
       productoSku:        liveEtiqueta?.productoSku ?? null,
+      productoNombre:     liveEtiqueta?.productoNombre ?? null,
       estado:             "ok",
     };
     setPaquetes(prev => [...prev, nuevo]);
