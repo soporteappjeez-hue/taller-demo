@@ -11,7 +11,8 @@ import {
   CLIENT_NOTIFICATION_LABELS,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { X, Save, User, Phone, Wrench, DollarSign, ClipboardList, Clock } from "lucide-react";
+import { X, Save, User, Phone, Wrench, DollarSign, ClipboardList, Clock, Camera } from "lucide-react";
+import PhotoUpload from "@/components/PhotoUpload";
 
 interface OrderFormProps {
   initial?: WorkOrder;
@@ -346,6 +347,19 @@ export default function OrderForm({ initial, onSave, onClose }: OrderFormProps) 
                 <span className="text-green-400 text-sm font-bold">Sí</span>
               )}
             </label>
+          </section>
+
+          {/* Fotos del equipo */}
+          <section>
+            <h3 className="flex items-center gap-2 text-orange-400 font-bold text-sm uppercase tracking-wider mb-3">
+              <Camera className="w-4 h-4" />
+              Fotos del Equipo
+            </h3>
+            <PhotoUpload
+              urls={form.photoUrls}
+              onChange={(urls) => set("photoUrls", urls)}
+              maxPhotos={5}
+            />
           </section>
         </form>
 
