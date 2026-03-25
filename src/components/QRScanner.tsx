@@ -48,7 +48,7 @@ const CP_MAP: Record<string, string> = {
   // Ezeiza
   "1802": "Ezeiza", "1803": "Ezeiza", "1804": "Ezeiza",
   // Esteban Echeverría
-  "1842": "Esteban Echeverría", "1843": "Esteban Echeverría", "1844": "Esteban Echeverría",
+  "1843": "Esteban Echeverría", "1844": "Esteban Echeverría",
   // CABA (rangos)
   "1000": "CABA","1001":"CABA","1002":"CABA","1003":"CABA","1004":"CABA","1005":"CABA",
   "1006":"CABA","1007":"CABA","1008":"CABA","1009":"CABA","1010":"CABA","1011":"CABA",
