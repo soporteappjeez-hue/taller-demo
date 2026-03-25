@@ -152,7 +152,9 @@ export default function FlexPage() {
           if (alerta) nuevasAlertas.push(alerta);
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? JSON.stringify(err);
         if (msg.includes("unique") || msg.includes("duplicate") || msg.includes("23505")) {
           duplicados++;
         } else {
