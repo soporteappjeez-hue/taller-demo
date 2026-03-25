@@ -551,24 +551,47 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
             )}
 
             {/* Marco de enfoque — color dinámico según detección */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: "140px" }}>
-              <div className="relative w-72 h-44">
-                {/* Esquinas del marco */}
-                <div className={`absolute top-0 left-0 w-8 h-8 border-2 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "3px 0 0 3px" }} />
-                <div className={`absolute top-0 right-0 w-8 h-8 border-2 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "3px 3px 0 0" }} />
-                <div className={`absolute bottom-0 left-0 w-8 h-8 border-2 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "0 0 3px 3px" }} />
-                <div className={`absolute bottom-0 right-0 w-8 h-8 border-2 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "0 3px 3px 0" }} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: "130px" }}>
+              <div className="relative" style={{ width: "88vw", maxWidth: "380px", height: "52vw", maxHeight: "230px" }}>
+                {/* Borde completo semitransparente de fondo */}
+                <div className={`absolute inset-0 rounded-lg border-2 transition-colors duration-300 ${frameColor}`} style={{ opacity: 0.35 }} />
+
+                {/* Esquinas del marco — gruesas y bien visibles */}
+                <div className={`absolute top-0 left-0 w-10 h-10 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "4px 0 0 4px", borderStyle: "solid", borderRadius: "4px 0 0 0" }} />
+                <div className={`absolute top-0 right-0 w-10 h-10 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "4px 4px 0 0", borderStyle: "solid", borderRadius: "0 4px 0 0" }} />
+                <div className={`absolute bottom-0 left-0 w-10 h-10 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "0 0 4px 4px", borderStyle: "solid", borderRadius: "0 0 0 4px" }} />
+                <div className={`absolute bottom-0 right-0 w-10 h-10 transition-colors duration-300 ${frameColor}`} style={{ borderWidth: "0 4px 4px 0", borderStyle: "solid", borderRadius: "0 0 4px 0" }} />
+
+                {/* Guía en la parte superior del recuadro */}
+                <div className="absolute -top-7 inset-x-0 flex justify-center">
+                  <span className="bg-black/70 text-white text-[11px] font-semibold px-3 py-1 rounded-full">
+                    Centra: Envío + CP + QR dentro del recuadro
+                  </span>
+                </div>
+
+                {/* Línea divisoria horizontal a 40% — separa zona "Envío ID" de zona "CP/QR" */}
+                <div className={`absolute left-4 right-4 transition-colors duration-300 ${frameColor}`} style={{ top: "40%", height: "1px", opacity: 0.4, background: "currentColor" }} />
+
+                {/* Etiquetas de zona dentro del marco */}
+                <div className="absolute top-1.5 left-3 flex items-center gap-1 opacity-60">
+                  <span className="text-white text-[9px] font-bold uppercase tracking-wider">Envío ID</span>
+                </div>
+                <div className="absolute left-3 flex items-center gap-1 opacity-60" style={{ top: "43%" }}>
+                  <span className="text-white text-[9px] font-bold uppercase tracking-wider">CP + Localidad + QR</span>
+                </div>
 
                 {/* Mensaje de detección dentro del marco */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   {liveScan === "found" && liveLocalidad ? (
-                    <div className="bg-green-600/90 rounded-xl px-4 py-2 text-center">
-                      <p className="text-white font-black text-base leading-tight">{liveLocalidad}</p>
+                    <div className="bg-green-600/90 rounded-xl px-4 py-2 text-center shadow-xl">
+                      <p className="text-white font-black text-lg leading-tight">{liveLocalidad}</p>
                       <p className="text-green-200 text-xs mt-0.5">
                         {ZONA_LABELS[FLEX_LOCALIDADES.find(l => l.nombre === liveLocalidad)?.zona ?? "lejana"]} · {fmt(calcPaquete(liveLocalidad, tarifas).precioML)}
                       </p>
-                      {liveEnvioId && (
-                        <p className="text-green-300 text-[10px] mt-1 font-mono">ID: {liveEnvioId}</p>
+                      {liveEnvioId ? (
+                        <p className="text-green-300 text-[11px] mt-1 font-mono font-bold">Envío: {liveEnvioId}</p>
+                      ) : (
+                        <p className="text-yellow-300 text-[11px] mt-1 font-semibold">⚠ Buscando ID de envío...</p>
                       )}
                     </div>
                   ) : (
