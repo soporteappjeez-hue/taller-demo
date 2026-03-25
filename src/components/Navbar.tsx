@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wrench, Package, LayoutDashboard, AlertTriangle, MessageCircle } from "lucide-react";
+import { Wrench, Package, LayoutDashboard, AlertTriangle, MessageCircle, BarChart2 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface NavbarProps {
   overdueCount?: number;
@@ -34,10 +35,17 @@ export default function Navbar({
       badge: lowStockCount > 0 ? lowStockCount : 0,
       badgeColor: "bg-yellow-500",
     },
+    {
+      href: "/estadisticas",
+      label: "Estadísticas",
+      icon: BarChart2,
+      badge: 0,
+      badgeColor: "",
+    },
   ];
 
   return (
-    <header className="bg-gray-900 border-b border-gray-700 sticky top-0 z-50">
+    <header className="bg-gray-900 dark:bg-gray-900 border-b border-gray-700 sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -60,7 +68,7 @@ export default function Navbar({
                   key={href}
                   href={href}
                   className={`
-                    relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm
+                    relative flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold text-sm
                     transition-colors duration-150
                     ${active
                       ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25"
@@ -86,7 +94,7 @@ export default function Navbar({
             {onOpenNotifications && (
               <button
                 onClick={onOpenNotifications}
-                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm
+                className={`relative flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold text-sm
                   transition-colors duration-150
                   ${notificationCount > 0
                     ? "bg-green-700/30 text-green-400 hover:bg-green-700/50"
@@ -104,6 +112,9 @@ export default function Navbar({
                 )}
               </button>
             )}
+
+            {/* Theme toggle */}
+            <ThemeToggle />
           </nav>
         </div>
       </div>

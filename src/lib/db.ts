@@ -3,7 +3,7 @@
 // ============================================================
 
 import { supabase } from "./supabase";
-import { WorkOrder, StockItem, PartToOrder } from "./types";
+import { WorkOrder, StockItem, PartToOrder, Pago, PlantillaWhatsApp } from "./types";
 
 // ─── Helpers de mapeo (snake_case DB ↔ camelCase app) ────────
 
@@ -26,6 +26,7 @@ function toOrder(r: Record<string, unknown>): WorkOrder {
     deliveryDate:       r.delivery_date as string | null,
     linkedParts:        (r.linked_parts as string[]) ?? [],
     internalNotes:      r.internal_notes as string,
+    photoUrls:          (r.photo_urls as string[]) ?? [],
   };
 }
 
@@ -48,6 +49,7 @@ function fromOrder(o: WorkOrder) {
     delivery_date:       o.deliveryDate,
     linked_parts:        o.linkedParts,
     internal_notes:      o.internalNotes,
+    photo_urls:          o.photoUrls ?? [],
   };
 }
 
@@ -228,6 +230,73 @@ export const partsToOrderDb = {
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from("repuestos_a_pedir").delete().eq("id", id);
+    if (error) throw error;
+  },
+};
+
+// ─── Pagos ────────────────────────────────────────────────────
+
+export const pagosDb = {
+  async getByOrder(orderId: string): Promise<Pago[]> {
+    const { data, error } = await supabase
+      .from("pagos")
+      .select("*")
+      .eq("order_id", orderId)
+      .order("paid_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id:      r.id as string,
+      orderId: r.order_id as string,
+      amount:  r.amount as number,
+      method:  r.method as Pago["method"],
+      notes:   r.notes as string,
+      paidAt:  r.paid_at as string,
+    }));
+  },
+  async create(p: Pago): Promise<void> {
+    const { error } = await supabase.from("pagos").insert({
+      id: p.id, order_id: p.orderId, amount: p.amount,
+      method: p.method, notes: p.notes, paid_at: p.paidAt,
+    });
+    if (error) throw error;
+  },
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from("pagos").delete().eq("id", id);
+    if (error) throw error;
+  },
+};
+
+// ─── Plantillas WhatsApp ──────────────────────────────────────
+
+export const plantillasDb = {
+  async getAll(): Promise<PlantillaWhatsApp[]> {
+    const { data, error } = await supabase
+      .from("plantillas_whatsapp")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id:        r.id as string,
+      name:      r.name as string,
+      message:   r.message as string,
+      createdAt: r.created_at as string,
+    }));
+  },
+  async create(t: PlantillaWhatsApp): Promise<void> {
+    const { error } = await supabase.from("plantillas_whatsapp").insert({
+      id: t.id, name: t.name, message: t.message, created_at: t.createdAt,
+    });
+    if (error) throw error;
+  },
+  async update(id: string, updates: Partial<PlantillaWhatsApp>): Promise<void> {
+    const mapped: Record<string, unknown> = {};
+    if (updates.name    !== undefined) mapped.name    = updates.name;
+    if (updates.message !== undefined) mapped.message = updates.message;
+    const { error } = await supabase.from("plantillas_whatsapp").update(mapped).eq("id", id);
+    if (error) throw error;
+  },
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from("plantillas_whatsapp").delete().eq("id", id);
     if (error) throw error;
   },
 };

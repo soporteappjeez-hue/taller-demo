@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Wrench, AlertTriangle, Package, CheckSquare, Clock, FileSpreadsheet, FileText, CheckCircle } from "lucide-react";
+import { Plus, Wrench, AlertTriangle, Package, CheckSquare, Clock, FileSpreadsheet, FileText, CheckCircle, MessageCircle } from "lucide-react";
 import { WorkOrder } from "@/lib/types";
 import { useOrders } from "@/hooks/useOrders";
 import { useInventory } from "@/hooks/useInventory";
@@ -15,6 +15,7 @@ import FiltersBar from "@/components/FiltersBar";
 import OrderCard from "@/components/OrderCard";
 import OrderForm from "@/components/OrderForm";
 import NotificationsPanel from "@/components/NotificationsPanel";
+import TemplateManager from "@/components/TemplateManager";
 
 function StatCard({
   label,
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -69,12 +71,10 @@ export default function DashboardPage() {
   const handleSave = async (order: WorkOrder) => {
     try {
       if (editingOrder) {
-        console.log("[handleSave] Actualizando orden:", order.id);
         await update(order.id, order);
         showToast("Orden actualizada con éxito");
       } else {
         const newOrder = { ...order, id: generateId(), entryDate: new Date().toISOString() };
-        console.log("[handleSave] Creando orden:", newOrder);
         await create(newOrder);
         showToast("¡Orden guardada con éxito!");
       }
@@ -82,7 +82,6 @@ export default function DashboardPage() {
       setEditingOrder(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[handleSave] ERROR:", msg);
       showToast(`Error: ${msg}`, "error");
     }
   };
@@ -97,7 +96,6 @@ export default function DashboardPage() {
     setEditingOrder(null);
   };
 
-  // Estadísticas
   const activeOrders = orders.filter((o) => o.status !== "entregado");
   const readyOrders = orders.filter((o) => o.status === "listo_para_retiro");
   const inRepairOrders = orders.filter((o) => o.status === "en_reparacion");
@@ -121,7 +119,7 @@ export default function DashboardPage() {
           <StatCard label="Esp. Repuesto" value={waitingPartsOrders.length} icon={Package} color="bg-yellow-600" />
         </div>
 
-        {/* Alerta 90 días prominente */}
+        {/* Alerta 90 días */}
         {overdueCount > 0 && (
           <div className="card-alert flex items-start gap-3">
             <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
@@ -142,7 +140,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Barra de filtros + Exportar */}
+        {/* Barra de filtros + Exportar + Plantillas */}
         <div className="space-y-3">
           <FiltersBar
             filters={filters}
@@ -150,33 +148,43 @@ export default function DashboardPage() {
             totalCount={orders.length}
             filteredCount={filtered.length}
           />
-          {filtered.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => exportOrdersToExcel(filtered)}
-                className="btn-secondary flex-1 sm:flex-none"
-              >
-                <FileSpreadsheet className="w-5 h-5 text-green-400" />
-                Excel
-                <span className="text-gray-500 text-sm font-normal">({filtered.length})</span>
-              </button>
-              <button
-                onClick={() => {
-                  const label =
-                    filters.motorType !== "all" ? `Motor ${filters.motorType}`
-                    : filters.status !== "all" ? `Estado: ${filters.status}`
-                    : filters.overdueOnly ? "Más de 90 días"
-                    : "Todas las órdenes";
-                  exportOrdersReportPDF(filtered, label);
-                }}
-                className="btn-secondary flex-1 sm:flex-none"
-              >
-                <FileText className="w-5 h-5 text-red-400" />
-                PDF
-                <span className="text-gray-500 text-sm font-normal">({filtered.length})</span>
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {filtered.length > 0 && (
+              <>
+                <button
+                  onClick={() => exportOrdersToExcel(filtered)}
+                  className="btn-secondary flex-1 sm:flex-none"
+                >
+                  <FileSpreadsheet className="w-5 h-5 text-green-400" />
+                  Excel
+                  <span className="text-gray-500 text-sm font-normal">({filtered.length})</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const label =
+                      filters.motorType !== "all" ? `Motor ${filters.motorType}`
+                      : filters.status !== "all" ? `Estado: ${filters.status}`
+                      : filters.overdueOnly ? "Más de 90 días"
+                      : "Todas las órdenes";
+                    exportOrdersReportPDF(filtered, label);
+                  }}
+                  className="btn-secondary flex-1 sm:flex-none"
+                >
+                  <FileText className="w-5 h-5 text-red-400" />
+                  PDF
+                  <span className="text-gray-500 text-sm font-normal">({filtered.length})</span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="btn-secondary flex-1 sm:flex-none"
+            >
+              <MessageCircle className="w-5 h-5 text-green-400" />
+              <span className="hidden sm:inline">Plantillas WA</span>
+              <span className="sm:hidden">Plantillas</span>
+            </button>
+          </div>
         </div>
 
         {/* Lista de órdenes */}
@@ -224,7 +232,6 @@ export default function DashboardPage() {
         <span className="hidden sm:inline text-base">Nueva Orden</span>
       </button>
 
-      {/* Modal formulario */}
       {showForm && (
         <OrderForm
           initial={editingOrder ?? undefined}
@@ -233,7 +240,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Panel de notificaciones */}
       {showNotifications && (
         <NotificationsPanel
           pending={pending}
@@ -244,7 +250,10 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Toast de éxito / error */}
+      {showTemplates && (
+        <TemplateManager onClose={() => setShowTemplates(false)} />
+      )}
+
       {toast && (
         <div
           className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3

@@ -44,7 +44,34 @@ export interface WorkOrder {
   linkedParts: string[]; // IDs de PartToOrder
   // Notas internas
   internalNotes: string;
+  // Fotos
+  photoUrls: string[];
+  // Pagos
+  totalPaid?: number;
 }
+
+export interface Pago {
+  id: string;
+  orderId: string;
+  amount: number;
+  method: "efectivo" | "transferencia" | "tarjeta" | "otro";
+  notes: string;
+  paidAt: string;
+}
+
+export interface PlantillaWhatsApp {
+  id: string;
+  name: string;
+  message: string;
+  createdAt: string;
+}
+
+export const PAYMENT_METHOD_LABELS: Record<Pago["method"], string> = {
+  efectivo:      "Efectivo",
+  transferencia: "Transferencia",
+  tarjeta:       "Tarjeta",
+  otro:          "Otro",
+};
 
 export interface StockItem {
   id: string;

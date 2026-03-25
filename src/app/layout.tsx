@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Taller MAQJEEZ",
@@ -14,15 +15,11 @@ export const viewport: Viewport = {
   themeColor: "#f97316",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
-      <body className="min-h-screen bg-gray-950">
-        {children}
+    <html lang="es" suppressHydrationWarning>
+      <body className="min-h-screen bg-gray-950 dark:bg-gray-950 light:bg-gray-50">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
