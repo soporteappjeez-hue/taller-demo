@@ -124,10 +124,15 @@ export const ordersDb = {
   },
 
   async create(order: WorkOrder): Promise<void> {
+    const payload = fromOrder(order);
+    console.log("[DB] Insertando en reparaciones:", payload);
     const { error } = await supabase
       .from("reparaciones")
-      .insert(fromOrder(order));
-    if (error) throw error;
+      .insert(payload);
+    if (error) {
+      console.error("[DB] Error Supabase:", error.message, error.details, error.hint);
+      throw error;
+    }
   },
 
   async update(id: string, updates: Partial<WorkOrder>): Promise<void> {

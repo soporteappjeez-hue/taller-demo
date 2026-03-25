@@ -63,22 +63,27 @@ export default function DashboardPage() {
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), type === "error" ? 8000 : 3500);
   };
 
   const handleSave = async (order: WorkOrder) => {
     try {
       if (editingOrder) {
+        console.log("[handleSave] Actualizando orden:", order.id);
         await update(order.id, order);
         showToast("Orden actualizada con éxito");
       } else {
-        await create({ ...order, id: generateId(), entryDate: new Date().toISOString() });
+        const newOrder = { ...order, id: generateId(), entryDate: new Date().toISOString() };
+        console.log("[handleSave] Creando orden:", newOrder);
+        await create(newOrder);
         showToast("¡Orden guardada con éxito!");
       }
       setShowForm(false);
       setEditingOrder(null);
-    } catch {
-      showToast("Error al guardar. Verificá la conexión.", "error");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[handleSave] ERROR:", msg);
+      showToast(`Error: ${msg}`, "error");
     }
   };
 
