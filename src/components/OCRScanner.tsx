@@ -134,7 +134,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
   const [busqueda, setBusqueda] = useState("");
   const [workerReady, setWorkerReady] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const workerRef = useRef<any>(null);
+  const workerRef = useRef<unknown>(null);
 
   const localidadesFiltradas = busqueda.trim()
     ? FLEX_LOCALIDADES.filter(l => l.nombre.toLowerCase().includes(busqueda.toLowerCase()))
@@ -175,7 +175,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
         if (!cancelled) setWorkerReady(true); // Continuar aunque falle, usará detección por texto
       }
     })();
-    return () => { cancelled = true; workerRef.current?.terminate?.(); };
+    return () => { cancelled = true; (workerRef.current as { terminate?: () => void })?.terminate?.(); };
   }, []);
 
   useEffect(() => { startCamera(); return () => stopCamera(); }, [startCamera, stopCamera]);
@@ -211,6 +211,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
       let ocrText = "";
       try {
         if (workerRef.current) {
+          const worker = workerRef.current as { recognize: (img: HTMLCanvasElement) => Promise<{ data: { text: string } }> };
           // Usar solo la mitad inferior de la foto (donde está la ciudad)
           const cropCanvas = document.createElement("canvas");
           cropCanvas.width = canvas.width;
@@ -218,7 +219,7 @@ export default function OCRScanner({ tarifas, onFinish, onClose }: Props) {
           const cropCtx = cropCanvas.getContext("2d")!;
           cropCtx.drawImage(canvas, 0, Math.floor(canvas.height * 0.3), canvas.width, cropCanvas.height, 0, 0, cropCanvas.width, cropCanvas.height);
           const processed = preprocessCanvas(cropCanvas);
-          const { data } = await workerRef.current.recognize(processed);
+          const { data } = await worker.recognize(processed);
           ocrText = data.text;
           localidad = detectLocalidadFromText(ocrText);
         }
