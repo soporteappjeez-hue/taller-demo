@@ -3,7 +3,7 @@
 // ============================================================
 
 import { supabase } from "./supabase";
-import { WorkOrder, StockItem, PartToOrder, Pago, PlantillaWhatsApp, AgendaCliente, HistorialReparacion, FlexEnvio } from "./types";
+import { WorkOrder, StockItem, PartToOrder, Pago, PlantillaWhatsApp, AgendaCliente, HistorialReparacion, FlexEnvio, ClienteFlex, FidelAlerta, FidelFase } from "./types";
 
 // ─── Helpers de mapeo (snake_case DB ↔ camelCase app) ────────
 
@@ -494,3 +494,100 @@ export const flexDb = {
     if (error) throw error;
   },
 };
+
+// ─── Lógica de regalo sugerido ────────────────────────────────────────────────
+function sugerirRegalo(producto: string): string {
+  const p = producto.toLowerCase();
+  if (/desmalezadora|desmale|cabezal|cuchilla|arnes|arnés|tanza|nylon|trimmer/.test(p))
+    return "Tanza de nylon";
+  if (/motosierra|sierra|cadena|espada|motosier/.test(p))
+    return "Aceite de cadena";
+  if (/motor|cilindro|carburador|piston|pistón|bujia|bujía|filtro|bomba/.test(p))
+    return "Aceite 2T";
+  if (/hidrolavadora|hidrola|bomba agua|presion|presión/.test(p))
+    return "Kit de sellos";
+  return "Regalo sorpresa MAQJEEZ";
+}
+
+function faseLabel(fase: FidelFase): string {
+  return fase === "oro" ? "🥇 ORO" : fase === "plata" ? "🥈 PLATA" : "🥉 BRONCE";
+}
+
+function toClienteFlex(r: Record<string, unknown>): ClienteFlex {
+  return {
+    id:                (r.id as string),
+    usuarioML:         (r.usuario_ml as string),
+    nombre:            (r.nombre as string) ?? "",
+    totalCompras:      (r.total_compras as number) ?? 1,
+    comprasEsteMes:    (r.compras_este_mes as number) ?? 1,
+    fase:              (r.fase as FidelFase) ?? "bronce",
+    ultimoProducto:    (r.ultimo_producto as string) ?? "",
+    ultimaLocalidad:   (r.ultima_localidad as string) ?? "",
+    fechaUltimaCompra: (r.fecha_ultima_compra as string) ?? "",
+    createdAt:         (r.created_at as string) ?? "",
+  };
+}
+
+export const clientesFlexDb = {
+  // Registra una compra y devuelve la alerta de fidelización
+  async registrarCompra(
+    usuarioML: string,
+    nombre: string,
+    producto: string,
+    localidad: string,
+  ): Promise<FidelAlerta | null> {
+    if (!usuarioML) return null;
+    try {
+      // Guardar fase anterior para detectar si subió
+      const { data: prevData } = await supabase
+        .from("clientes_flex")
+        .select("fase, total_compras")
+        .eq("usuario_ml", usuarioML)
+        .maybeSingle();
+      const fasePrev = (prevData?.fase as FidelFase) ?? "bronce";
+
+      // Upsert via función SQL
+      const { data, error } = await supabase.rpc("upsert_cliente_flex", {
+        p_usuario_ml:       usuarioML,
+        p_nombre:           nombre,
+        p_ultimo_producto:  producto,
+        p_ultima_localidad: localidad,
+      });
+      if (error || !data || data.length === 0) return null;
+
+      const row = data[0] as { total_compras: number; compras_este_mes: number; fase: string };
+      const faseActual = row.fase as FidelFase;
+      const esNuevoNivel = faseActual !== fasePrev;
+
+      return {
+        usuarioML,
+        nombre,
+        totalCompras:    row.total_compras,
+        comprasEsteMes:  row.compras_este_mes,
+        fase:            faseActual,
+        esNuevoNivel,
+        regalSugerido:   sugerirRegalo(producto),
+        ultimoProducto:  producto,
+      };
+    } catch (_) { return null; }
+  },
+
+  async getAll(): Promise<ClienteFlex[]> {
+    const { data } = await supabase
+      .from("clientes_flex")
+      .select("*")
+      .order("total_compras", { ascending: false });
+    return (data ?? []).map(r => toClienteFlex(r as Record<string, unknown>));
+  },
+
+  async getByUsuario(usuarioML: string): Promise<ClienteFlex | null> {
+    const { data } = await supabase
+      .from("clientes_flex")
+      .select("*")
+      .eq("usuario_ml", usuarioML)
+      .maybeSingle();
+    return data ? toClienteFlex(data as Record<string, unknown>) : null;
+  },
+};
+
+export { faseLabel, sugerirRegalo };

@@ -4,14 +4,15 @@ import { useState, useEffect, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import OCRScanner, { PaqueteOCR } from "@/components/OCRScanner";
-import { flexDb } from "@/lib/db";
+import { flexDb, clientesFlexDb, faseLabel } from "@/lib/db";
 import {
   FlexEnvio, FlexZona,
-  FLEX_LOCALIDADES, FLEX_TARIFAS,
+  FLEX_LOCALIDADES, FLEX_TARIFAS, FidelAlerta,
 } from "@/lib/types";
 import {
   Truck, Trash2, TrendingUp, DollarSign,
   MapPin, Package, Camera, BarChart2, Settings, Calendar,
+  Star, Gift, AlertTriangle,
 } from "lucide-react";
 
 const fmt = (n: number) =>
@@ -81,6 +82,7 @@ export default function FlexPage() {
   const [loading, setLoading]         = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showOCR, setShowOCR]         = useState(false);
+  const [alertas, setAlertas]         = useState<FidelAlerta[]>([]);
   const { tarifas, update: updateTarifa } = useTarifas();
   const [settingEdit, setSettingEdit] = useState<Record<FlexZona, string>>({
     cercana: "4490", media: "6490", lejana: "8490",
@@ -106,6 +108,8 @@ export default function FlexPage() {
     setShowOCR(false);
     const hoy = new Date().toISOString().slice(0, 10);
     const validos = paquetes.filter(p => p.localidad && p.estado === "ok");
+    const nuevasAlertas: FidelAlerta[] = [];
+
     for (const p of validos) {
       try {
         await flexDb.create({
@@ -126,10 +130,21 @@ export default function FlexPage() {
           packId:             p.packId ?? "",
           createdAt:          new Date().toISOString(),
         });
+        // Registrar compra en sistema de fidelización
+        if (p.usuarioML) {
+          const alerta = await clientesFlexDb.registrarCompra(
+            p.usuarioML,
+            p.nombreDestinatario ?? "",
+            p.productoSku ?? "",
+            p.localidad!,
+          );
+          if (alerta) nuevasAlertas.push(alerta);
+        }
       } catch (_) {}
     }
     await load();
-    if (validos.length > 0) alert(`✓ ${validos.length} envíos guardados correctamente.`);
+    if (nuevasAlertas.length > 0) setAlertas(nuevasAlertas);
+    else if (validos.length > 0) alert(`✓ ${validos.length} envíos guardados correctamente.`);
     else alert("No se detectaron zonas válidas en las fotos.");
   };
 
@@ -488,6 +503,109 @@ export default function FlexPage() {
           onFinish={handleOCRFinish}
           onClose={() => setShowOCR(false)}
         />
+      )}
+
+      {/* ══ MODAL DE ALERTAS DE FIDELIZACIÓN ══ */}
+      {alertas.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-gray-900 rounded-3xl border border-gray-700 shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-600 to-orange-600 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-white" />
+                <h3 className="text-white font-black text-lg">Alertas de Fidelización</h3>
+              </div>
+              <span className="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded-full">
+                {alertas.length} cliente{alertas.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              {alertas.map((a, i) => {
+                const faseBg =
+                  a.fase === "oro"   ? "border-yellow-500/60 bg-yellow-900/20" :
+                  a.fase === "plata" ? "border-gray-400/60 bg-gray-700/20" :
+                                       "border-orange-700/60 bg-orange-900/10";
+                return (
+                  <div key={i} className={`rounded-2xl border p-4 space-y-2 ${faseBg}`}>
+                    {/* Header cliente */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-white font-bold">{a.nombre || a.usuarioML}</p>
+                        <p className="text-gray-400 text-xs font-mono">@{a.usuarioML}</p>
+                      </div>
+                      <div className={`text-right`}>
+                        <p className="text-lg font-black">{faseLabel(a.fase)}</p>
+                        {a.esNuevoNivel && (
+                          <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
+                            ¡SUBIÓ DE NIVEL!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Estadísticas */}
+                    <div className="flex gap-4">
+                      <div className="bg-gray-800/60 rounded-xl px-3 py-2 text-center flex-1">
+                        <p className="text-gray-400 text-xs">Total compras</p>
+                        <p className="text-white font-black text-xl">{a.totalCompras}</p>
+                      </div>
+                      <div className="bg-gray-800/60 rounded-xl px-3 py-2 text-center flex-1">
+                        <p className="text-gray-400 text-xs">Este mes</p>
+                        <p className="text-white font-black text-xl">{a.comprasEsteMes}</p>
+                      </div>
+                      <div className="bg-gray-800/60 rounded-xl px-3 py-2 text-center flex-1">
+                        <p className="text-gray-400 text-xs">Próxima fase</p>
+                        <p className="text-white font-black text-xl">
+                          {a.fase === "bronce" ? `${10 - a.totalCompras}` :
+                           a.fase === "plata"  ? `${50 - a.totalCompras}` : "✓"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Alerta de fase */}
+                    <div className={`rounded-xl p-3 flex items-start gap-3 ${
+                      a.comprasEsteMes >= 3 || a.totalCompras >= 10
+                        ? "bg-green-900/40 border border-green-600/40"
+                        : "bg-gray-800/40"
+                    }`}>
+                      <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                        a.fase === "oro" ? "text-yellow-400" :
+                        a.fase === "plata" ? "text-gray-300" : "text-orange-400"
+                      }`} />
+                      <div>
+                        <p className="text-white text-sm font-semibold">
+                          {a.fase === "oro"   ? "¡CLIENTE VIP VERDENT! Atención prioritaria" :
+                           a.fase === "plata" ? "Cliente Fiel — Considera descuento especial" :
+                           a.comprasEsteMes >= 3 ? "¡+3 compras este mes! Momento de regalo" :
+                           `${3 - a.comprasEsteMes} compra(s) más para fase Bronce`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Regalo sugerido */}
+                    {a.ultimoProducto && (
+                      <div className="bg-purple-900/30 border border-purple-600/40 rounded-xl p-3 flex items-center gap-3">
+                        <Gift className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                        <div>
+                          <p className="text-purple-300 text-xs font-semibold uppercase tracking-wider">Regalo sugerido</p>
+                          <p className="text-white font-bold">{a.regalSugerido}</p>
+                          <p className="text-gray-400 text-xs mt-0.5">Compró: {a.ultimoProducto}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t border-gray-700">
+              <button
+                onClick={() => setAlertas([])}
+                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 rounded-2xl transition-colors"
+              >
+                Entendido — Continuar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <BottomNav />
