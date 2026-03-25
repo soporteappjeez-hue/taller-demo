@@ -30,6 +30,7 @@ import {
   Printer,
   User,
   Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { exportOrderDetailPDF } from "@/lib/exportPDF";
@@ -37,6 +38,7 @@ import PaymentModal from "@/components/PaymentModal";
 import PrintOrder from "@/components/PrintOrder";
 import ClientHistory from "@/components/ClientHistory";
 import PhotoManager from "@/components/PhotoManager";
+import BudgetImage from "@/components/BudgetImage";
 
 interface OrderCardProps {
   order: WorkOrder;
@@ -56,6 +58,7 @@ export default function OrderCard({ order, onEdit, onDelete }: OrderCardProps) {
   const [showPrint, setShowPrint] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showBudget, setShowBudget] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(order);
 
   const overdue = isOverdue90Days(currentOrder);
@@ -175,6 +178,14 @@ export default function OrderCard({ order, onEdit, onDelete }: OrderCardProps) {
           {/* ── Fila 4: Acciones secundarias ── */}
           <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-700/60">
             <button
+              onClick={() => setShowBudget(true)}
+              className="btn btn-sm flex-1 rounded-xl bg-orange-500/20 text-orange-300 hover:bg-orange-500/40 border border-orange-500/40 font-bold"
+              title="Generar Presupuesto PNG"
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span className="text-xs">Presupuesto</span>
+            </button>
+            <button
               onClick={() => setShowPayment(true)}
               className="btn btn-sm flex-1 min-w-[44px] max-w-[80px] rounded-xl bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-700/50"
               title="Pagos"
@@ -273,6 +284,7 @@ export default function OrderCard({ order, onEdit, onDelete }: OrderCardProps) {
 
       {showPayment && <PaymentModal order={currentOrder} onClose={() => setShowPayment(false)} />}
       {showPrint && <PrintOrder order={currentOrder} onClose={() => setShowPrint(false)} />}
+      {showBudget && <BudgetImage order={currentOrder} onClose={() => setShowBudget(false)} />}
       {showHistory && (
         <ClientHistory
           phone={currentOrder.clientPhone}
