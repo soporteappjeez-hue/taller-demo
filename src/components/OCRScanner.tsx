@@ -237,12 +237,14 @@ function detectCPFromText(text: string): string | null {
     /\b(\d{4})\b/g,
   ];
   for (const pattern of patterns) {
-    if (pattern.source.includes("g")) {
-      // Para el patrón global, buscar todos los matches de 4 dígitos
-      const matches = text.matchAll(pattern as RegExp);
-      for (const match of matches) {
+    if (pattern.flags.includes("g")) {
+      // Para el patrón global, usar exec en bucle (compatible con ES5)
+      const re = new RegExp(pattern.source, pattern.flags);
+      let match = re.exec(text);
+      while (match !== null) {
         const loc = CP_MAP[match[1]];
         if (loc) return loc;
+        match = re.exec(text);
       }
     } else {
       const match = text.match(pattern);
