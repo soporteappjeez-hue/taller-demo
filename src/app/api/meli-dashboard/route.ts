@@ -107,7 +107,7 @@ export async function GET() {
       .from("meli_accounts")
       .select("id, meli_user_id, nickname, access_token_enc, created_at")
       .eq("status", "active")
-      .order("created_at", { ascending: true });
+      .order("nickname", { ascending: true });
 
     if (error || !accounts?.length) {
       return NextResponse.json([]);

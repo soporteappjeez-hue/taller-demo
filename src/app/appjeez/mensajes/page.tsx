@@ -225,12 +225,6 @@ function QuestionCard({ q, onAnswered }: { q: Question; onAnswered: (id: number)
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              {roman && (
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md"
-                  style={{ background: "#FFE600", color: "#121212" }}>
-                  {roman}
-                </span>
-              )}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: "#FFE60018", color: "#FFE600" }}>
                 @{account}

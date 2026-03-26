@@ -42,7 +42,7 @@ export async function GET(req: Request) {
       .from("meli_accounts")
       .select("id, meli_user_id, nickname, access_token_enc")
       .eq("status", "active")
-      .order("created_at", { ascending: true });
+      .order("nickname", { ascending: true });
 
     logs.push(`accounts_count:${accounts?.length ?? 0}`);
     if (error) logs.push(`db_error:${error.message}`);
