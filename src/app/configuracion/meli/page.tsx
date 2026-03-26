@@ -100,13 +100,20 @@ function ConfigMeliContent() {
       {/* Header */}
       <div className="sticky top-0 z-30 px-4 py-4 flex items-center gap-3 border-b border-white/10"
         style={{ background: "rgba(18,18,18,0.95)", backdropFilter: "blur(12px)" }}>
-        <Link href="/taller" className="p-2 rounded-xl hover:bg-white/10 text-gray-400">
+        <Link href="/" className="p-2 rounded-xl hover:bg-white/10 text-gray-400">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-base font-black text-white">Configuración MeLi</h1>
           <p className="text-xs text-gray-500">Cuentas de Mercado Libre conectadas</p>
         </div>
+        <Link
+          href="/appjeez"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+          style={{ background: "#FF572222", color: "#FF5722", border: "1px solid #FF572244" }}
+        >
+          Ir al Panel →
+        </Link>
       </div>
 
       <div className="px-4 py-6 max-w-lg mx-auto space-y-6">
