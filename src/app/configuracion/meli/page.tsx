@@ -9,6 +9,7 @@ import {
   ShieldCheck, Zap, ArrowLeft, User, Clock,
 } from "lucide-react";
 
+// v2 - usa API route con service_role
 // ── Tipos ──────────────────────────────────────────────────────
 interface MeliAccount {
   id: string;
