@@ -179,23 +179,63 @@ export default function LandingPage() {
           {meliStatus === "connected" ? (
             <Link
               href="/appjeez"
-              className="group w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-lg transition-all hover:scale-105"
-              style={{ background: "#FFE600", boxShadow: "0 0 30px rgba(255,230,0,0.45)", color: "#121212" }}
+              className="group w-full inline-flex items-center gap-0 rounded-xl overflow-hidden transition-all hover:scale-105"
+              style={{ boxShadow: "0 4px 24px rgba(180,134,11,0.5)" }}
             >
-              Mercado Libre — Ingresar al Panel
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              {/* Icono izquierdo */}
+              <div className="flex items-center justify-center w-16 h-16 flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #b8860b 0%, #8B6914 100%)" }}>
+                <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+                  <ellipse cx="24" cy="24" rx="22" ry="22" fill="#C9A84C" opacity="0.3"/>
+                  <path d="M14 28c2-4 6-8 10-8s8 4 10 8" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+                  <path d="M18 22c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="20" cy="30" r="2" fill="#fff"/>
+                  <circle cx="28" cy="30" r="2" fill="#fff"/>
+                  <path d="M20 30c0 2 1 3 4 3s4-1 4-3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+              {/* Texto */}
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-3"
+                style={{ background: "linear-gradient(135deg, #C9A84C 0%, #b8860b 100%)" }}>
+                <span className="font-black text-sm tracking-wide" style={{ color: "#121212" }}>
+                  MERCADO LIBRE —
+                </span>
+                <span className="font-bold text-sm" style={{ color: "#121212" }}>
+                  Ingresar al Panel
+                </span>
+              </div>
+              {/* Flecha derecha */}
+              <div className="flex items-center justify-center w-12 h-16 flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #b8860b 0%, #8B6914 100%)" }}>
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" style={{ color: "#fff" }} />
+              </div>
             </Link>
           ) : meliStatus === "disconnected" ? (
             <Link
               href="/configuracion/meli"
-              className="group w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-lg transition-all hover:scale-105"
-              style={{ background: "#FFE600", boxShadow: "0 0 30px rgba(255,230,0,0.40)", color: "#003087" }}
+              className="group w-full inline-flex items-center gap-0 rounded-xl overflow-hidden transition-all hover:scale-105"
+              style={{ boxShadow: "0 4px 24px rgba(180,134,11,0.5)" }}
             >
-              Conectar Mercado Libre
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              <div className="flex items-center justify-center w-16 h-16 flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #b8860b 0%, #8B6914 100%)" }}>
+                <svg viewBox="0 0 48 48" width="36" height="36" fill="none">
+                  <path d="M14 28c2-4 6-8 10-8s8 4 10 8" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+                  <circle cx="20" cy="30" r="2" fill="#fff"/>
+                  <circle cx="28" cy="30" r="2" fill="#fff"/>
+                </svg>
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-3"
+                style={{ background: "linear-gradient(135deg, #C9A84C 0%, #b8860b 100%)" }}>
+                <span className="font-black text-sm tracking-wide" style={{ color: "#121212" }}>MERCADO LIBRE —</span>
+                <span className="font-bold text-sm" style={{ color: "#121212" }}>Conectar cuenta</span>
+              </div>
+              <div className="flex items-center justify-center w-12 h-16 flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #b8860b 0%, #8B6914 100%)" }}>
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" style={{ color: "#fff" }} />
+              </div>
             </Link>
           ) : (
-            <div className="w-full h-14 rounded-2xl bg-white/5 animate-pulse" />
+            <div className="w-full h-16 rounded-xl bg-white/5 animate-pulse" />
           )}
         </div>
 
