@@ -201,6 +201,12 @@ function AccountPanel({ data, defaultOpen }: { data: AccountDash; defaultOpen?: 
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2 flex-wrap">
+              {data.roman_index && (
+                <span className="text-xs font-black px-2 py-0.5 rounded-lg"
+                  style={{ background: "#FFE600", color: "#121212" }}>
+                  {data.roman_index}
+                </span>
+              )}
               <p className="font-black text-white text-base">@{data.account}</p>
               {data.reputation?.power_seller_status && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#FFE60022", color: "#FFE600" }}>
