@@ -172,34 +172,16 @@ export default function LandingPage() {
           Sistema integral de gestión para talleres de motoherramientas. Órdenes, inventario, ventas y logística Flex — todo conectado a Supabase.
         </p>
 
-        {/* ── Estado de conexión MeLi + CTA dinámico ── */}
+        {/* ── CTA dinámico ── */}
         <div className="relative z-10 flex flex-col items-center gap-3 w-full max-w-sm">
-
-          {/* Badge estado MeLi */}
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold border transition-all ${
-            meliStatus === "connected"
-              ? "border-green-500/40 text-green-400 bg-green-500/10"
-              : meliStatus === "disconnected"
-              ? "border-red-500/30 text-red-400 bg-red-500/08"
-              : "border-white/10 text-gray-500 bg-white/5"
-          }`}>
-            {meliStatus === "loading" && <span className="w-2 h-2 rounded-full bg-gray-500 animate-pulse" />}
-            {meliStatus === "connected" && <CheckCircle className="w-4 h-4" />}
-            {meliStatus === "disconnected" && <AlertCircle className="w-4 h-4" />}
-            {meliStatus === "loading"      && "Verificando conexión MeLi..."}
-            {meliStatus === "connected"    && `MeLi conectado · @${meliNickname}`}
-            {meliStatus === "disconnected" && "MeLi no conectado"}
-          </div>
-
-          {/* CTA principal */}
           {meliStatus === "connected" ? (
             <Link
               href="/appjeez"
               className="group w-full inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-lg transition-all hover:scale-105"
-              style={{ background: "#FF5722", boxShadow: "0 0 30px rgba(255,87,34,0.50)", color: "#fff" }}
+              style={{ background: "#FFE600", boxShadow: "0 0 30px rgba(255,230,0,0.45)", color: "#121212" }}
             >
-              <Wrench className="w-6 h-6" />
-              Ingresar al Panel AppJeez
+              <Image src="/logo-maqjeez.png" alt="ML" width={24} height={24} className="object-contain" />
+              Mercado Libre — Ingresar al Panel
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
           ) : meliStatus === "disconnected" ? (
@@ -214,14 +196,6 @@ export default function LandingPage() {
             </Link>
           ) : (
             <div className="w-full h-14 rounded-2xl bg-white/5 animate-pulse" />
-          )}
-
-          {/* Link secundario */}
-          {meliStatus === "connected" && (
-            <Link href="/configuracion/meli"
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-400">
-              <Settings className="w-3.5 h-3.5" /> Gestionar cuentas MeLi
-            </Link>
           )}
         </div>
 
