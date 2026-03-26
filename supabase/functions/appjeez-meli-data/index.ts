@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
         meliGet(`/orders/search?seller=${uid}&order.status=paid&order.date_created.from=${todayISO}&limit=50`, token),
         meliGet(`/shipments/search?seller_id=${uid}&status=ready_to_ship&limit=1`, token),
         meliGet(`/users/${uid}/items/search?limit=1`, token),
-        meliGet(`/questions/search?status=UNANSWERED&limit=1`, token),
+        meliGet(`/questions/search?seller_id=${uid}&status=UNANSWERED&limit=1`, token),
       ]);
 
       const user  = userData.status    === "fulfilled" ? userData.value    : null;

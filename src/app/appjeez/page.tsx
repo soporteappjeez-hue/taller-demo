@@ -263,7 +263,7 @@ function AccountPanel({ data, defaultOpen }: { data: AccountDash; defaultOpen?: 
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { label: "Ver preguntas",    color: "#FF5722", href: `/appjeez/mensajes`, icon: <MessageCircle className="w-4 h-4" /> },
+                { label: "Ver preguntas",    color: "#FF5722", href: `/appjeez/mensajes`, icon: <MessageCircle className="w-4 h-4" />, badge: data.unanswered_questions },
                 { label: "Ver ventas",       color: "#39FF14", href: `/appjeez/ordenes`,       icon: <ShoppingCart className="w-4 h-4" /> },
                 { label: "Ver envíos",       color: "#00E5FF", href: `/appjeez/ordenes`,       icon: <Truck className="w-4 h-4" /> },
                 { label: "Ver publicaciones",color: "#FFE600", href: `/appjeez/publicaciones`, icon: <Package className="w-4 h-4" /> },
@@ -273,11 +273,19 @@ function AccountPanel({ data, defaultOpen }: { data: AccountDash; defaultOpen?: 
                   href={a.href}
                   target={a.href.startsWith("http") ? "_blank" : undefined}
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-opacity hover:opacity-80"
+                  className="relative flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-opacity hover:opacity-80"
                   style={{ background: a.color + "18", color: a.color, border: `1px solid ${a.color}33` }}
                 >
                   {a.icon} {a.label}
                   {a.href.startsWith("http") && <ExternalLink className="w-3 h-3" />}
+                  {"badge" in a && (a as { badge?: number }).badge! > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+                      style={{ background: "#FF5722" }}
+                    >
+                      {(a as { badge?: number }).badge! > 9 ? "9+" : (a as { badge?: number }).badge}
+                    </span>
+                  )}
                 </a>
               ))}
             </div>
@@ -297,19 +305,27 @@ function AppJeezInner() {
   const [error, setError]       = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [totalQuestionsAlert, setTotalQuestionsAlert] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch("/api/meli-dashboard");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setAccounts(await res.json());
+      const data: AccountDash[] = await res.json();
+      setAccounts(data);
       setLastUpdate(new Date());
+      const q = data.reduce((s, a) => s + (a.unanswered_questions ?? 0), 0);
+      setTotalQuestionsAlert(q);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const totalUrgent = accounts.reduce(
     (s, a) => s + (a.unanswered_questions ?? 0) + (a.ready_to_ship ?? 0) + (a.pending_messages ?? 0), 0
@@ -348,7 +364,18 @@ function AppJeezInner() {
                 ? { background: "#FFE60018", color: "#FFE600" }
                 : { color: "#6B7280" }}
             >
-              {n.icon} {n.label}
+              <span className="relative">
+                {n.icon}
+                {n.label === "Mensajería" && totalQuestionsAlert > 0 && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black"
+                    style={{ background: "#FF5722" }}
+                  >
+                    {totalQuestionsAlert > 9 ? "9+" : totalQuestionsAlert}
+                  </span>
+                )}
+              </span>
+              {n.label}
             </Link>
           ))}
         </nav>

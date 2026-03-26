@@ -195,7 +195,11 @@ function MensajesInner() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => load(true), 60_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const handleAnswered = (id: number) => {
     setQuestions(qs => qs.filter(q => q.meli_question_id !== id));
