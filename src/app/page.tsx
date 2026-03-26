@@ -162,11 +162,6 @@ export default function LandingPage() {
           />
         </div>
 
-        <h1 className="relative z-10 text-3xl sm:text-5xl font-black text-white leading-tight mb-3">
-          <span style={{ color: "#FFE600", textShadow: "0 0 30px rgba(255,220,0,0.60)" }}>
-            AppJeez
-          </span>
-        </h1>
         <p className="relative z-10 font-bold text-base sm:text-lg mb-2" style={{ color: "#C9A84C" }}>
           Gestión de Cuentas y Ventas Masivas
         </p>
