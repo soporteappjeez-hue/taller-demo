@@ -100,8 +100,9 @@ export async function GET() {
         },
       });
     } catch (err) {
-      console.error(`Error for ${acc.meli_user_id}:`, err);
-      result.push({ account: acc.nickname, meli_user_id: acc.meli_user_id, error: "fetch_error" });
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Error for ${acc.meli_user_id}:`, msg);
+      result.push({ account: acc.nickname, meli_user_id: acc.meli_user_id, error: msg });
     }
   }
 
