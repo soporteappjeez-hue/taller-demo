@@ -55,7 +55,8 @@ export async function GET(req: Request) {
     const itemCache: Record<string, { title: string; thumbnail: string }> = {};
     const accLogs: object[] = [];
 
-    for (const [accIdx, acc] of accounts.entries()) {
+    for (let accIdx = 0; accIdx < accounts.length; accIdx++) {
+      const acc   = accounts[accIdx];
       const roman = ROMAN[accIdx] ?? String(accIdx + 1);
       const alog: Record<string, unknown> = { nickname: acc.nickname, meli_user_id: acc.meli_user_id };
       try {
