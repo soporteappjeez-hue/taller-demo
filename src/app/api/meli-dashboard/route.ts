@@ -97,23 +97,31 @@ async function processAccount(acc: {
   }
 }
 
+const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X"];
+
 export async function GET() {
   try {
     const supabase = createClient(SUPA_URL, SERVICE_KEY);
 
     const { data: accounts, error } = await supabase
       .from("meli_accounts")
-      .select("id, meli_user_id, nickname, access_token_enc")
-      .eq("status", "active");
+      .select("id, meli_user_id, nickname, access_token_enc, created_at")
+      .eq("status", "active")
+      .order("created_at", { ascending: true });
 
     if (error || !accounts?.length) {
       return NextResponse.json([]);
     }
 
-    // Procesar todas las cuentas en paralelo
+    // Procesar todas las cuentas en paralelo y añadir número romano
     const results = await Promise.all(accounts.map(processAccount));
+    const withRoman = results.map((r, i) => ({
+      ...r,
+      roman_index: ROMAN[i] ?? String(i + 1),
+      display_name: `${ROMAN[i] ?? i + 1} — ${(r as { account: string }).account}`,
+    }));
 
-    return NextResponse.json(results);
+    return NextResponse.json(withRoman);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

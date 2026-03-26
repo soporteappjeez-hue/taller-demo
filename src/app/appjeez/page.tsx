@@ -35,6 +35,8 @@ interface AccountDash {
   today_orders: number;
   today_sales_amount: number;
   reputation: Reputation;
+  roman_index: string;
+  display_name: string;
   error?: string;
 }
 
@@ -198,7 +200,11 @@ function AccountPanel({ data, defaultOpen }: { data: AccountDash; defaultOpen?: 
             <Store className="w-5 h-5" />
           </div>
           <div className="text-left">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black px-2 py-0.5 rounded-lg"
+                style={{ background: "#FFE600", color: "#121212" }}>
+                {data.roman_index ?? "·"}
+              </span>
               <p className="font-black text-white text-base">@{data.account}</p>
               {data.reputation?.power_seller_status && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#FFE60022", color: "#FFE600" }}>

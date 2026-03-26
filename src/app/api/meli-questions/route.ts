@@ -36,10 +36,13 @@ export async function GET(req: Request) {
   try {
     const supabase = createClient(SUPA_URL, SERVICE_KEY);
 
+    const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X"];
+
     const { data: accounts, error } = await supabase
       .from("meli_accounts")
       .select("id, meli_user_id, nickname, access_token_enc")
-      .eq("status", "active");
+      .eq("status", "active")
+      .order("created_at", { ascending: true });
 
     logs.push(`accounts_count:${accounts?.length ?? 0}`);
     if (error) logs.push(`db_error:${error.message}`);
@@ -52,7 +55,8 @@ export async function GET(req: Request) {
     const itemCache: Record<string, { title: string; thumbnail: string }> = {};
     const accLogs: object[] = [];
 
-    for (const acc of accounts) {
+    for (const [accIdx, acc] of accounts.entries()) {
+      const roman = ROMAN[accIdx] ?? String(accIdx + 1);
       const alog: Record<string, unknown> = { nickname: acc.nickname, meli_user_id: acc.meli_user_id };
       try {
         const token = await decrypt(acc.access_token_enc, ENC_KEY);
@@ -112,7 +116,7 @@ export async function GET(req: Request) {
             date_created:     q.date_created,
             answer_text:      q.answer?.text ?? null,
             answer_date:      q.answer?.date_created ?? null,
-            meli_accounts:    { nickname: acc.nickname },
+            meli_accounts:    { nickname: acc.nickname, roman_index: roman },
           });
         }
       } catch (err) {
