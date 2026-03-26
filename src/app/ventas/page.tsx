@@ -600,7 +600,7 @@ export default function VentasPage() {
                         <YAxis tick={{ fill: "#6B7280", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => "$" + (v / 1000).toFixed(0) + "k"} />
                         <Tooltip
                           contentStyle={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff" }}
-                          formatter={(v: number) => [fmt(v), "Total"]}
+                          formatter={(v: number | string | undefined) => [fmt(Number(v ?? 0)), "Total"]}
                         />
                         <Bar dataKey="total" radius={[6, 6, 0, 0]}>
                           {chartFormatted.map((_, i) => (
