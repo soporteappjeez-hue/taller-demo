@@ -202,7 +202,7 @@ export async function POST(req: Request) {
 
         // Incluir TODOS los atributos del item original con formato completo
         const rawAttrs = (item.attributes as Array<Record<string, unknown>> | undefined) ?? [];
-        const readonlyIds = new Set(["ITEM_CONDITION","SELLER_SKU","GTIN","EAN","ISBN","UPC"]);
+        const readonlyIds = new Set(["ITEM_CONDITION","SELLER_SKU"]);
         const safeAttrs = rawAttrs
           .filter(a => a.id && !readonlyIds.has(String(a.id)))
           .map(a => {
