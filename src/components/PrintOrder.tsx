@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { WorkOrder } from "@/lib/types";
+import { WorkOrder, MOTOR_TYPE_LABELS } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Printer, X, Plus, Trash2 } from "lucide-react";
 
@@ -127,7 +127,7 @@ export default function PrintOrder({ order, onClose }: Props) {
             <p className="text-gray-600 text-xs">Tel: {order.clientPhone}</p>
             <p className="text-gray-600 text-xs">
               <span className="font-semibold">Equipo:</span> {order.brand} {order.model}
-              {" "}({order.motorType === "2T" ? "2 Tiempos" : "4 Tiempos"})
+              {" "}{MOTOR_TYPE_LABELS[order.motorType] ?? order.motorType}
             </p>
             <p className="text-gray-600 text-xs leading-snug">
               <span className="font-semibold">Falla:</span> {order.reportedIssues}

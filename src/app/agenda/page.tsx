@@ -39,7 +39,7 @@ function Timeline({ items }: { items: HistorialReparacion[] }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap gap-1.5 mb-1">
                       <span className={`text-xs font-black px-2 py-0.5 rounded-lg border
-                        ${o.motorType === "2T"
+                        ${o.motorType === "desmalezadora"
                           ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
                           : "bg-orange-500/20 text-orange-300 border-orange-500/40"}`}>
                         {o.motorType}
@@ -180,7 +180,7 @@ function ClienteModal({ cliente, onClose }: { cliente: AgendaCliente; onClose: (
               {equipos.map((eq, i) => (
                 <div key={i} className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2">
                   <p className="text-white text-sm font-semibold">{eq.brand} {eq.model}</p>
-                  <p className="text-gray-500 text-xs">{eq.type === "2T" ? "2 Tiempos" : "4 Tiempos"} · {eq.count} ingreso{eq.count !== 1 ? "s" : ""}</p>
+                  <p className="text-gray-500 text-xs">{eq.type} · {eq.count} ingreso{eq.count !== 1 ? "s" : ""}</p>
                 </div>
               ))}
             </div>

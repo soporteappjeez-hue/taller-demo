@@ -25,8 +25,8 @@ export default function StatsCharts({ orders }: Props) {
   }, [orders]);
 
   const byMotor = useMemo(() => [
-    { name: "2 Tiempos (2T)", value: orders.filter((o) => o.motorType === "2T").length },
-    { name: "4 Tiempos (4T)", value: orders.filter((o) => o.motorType === "4T").length },
+    { name: "Desmalezadora", value: orders.filter((o) => o.motorType === "desmalezadora").length },
+    { name: "Motosierra", value: orders.filter((o) => o.motorType === "motosierra").length },
   ], [orders]);
 
   const byBrand = useMemo(() => {

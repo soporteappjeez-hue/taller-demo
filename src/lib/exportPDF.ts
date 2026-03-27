@@ -216,7 +216,7 @@ export function exportOrderDetailPDF(o: WorkOrder) {
   // ── Equipment ──
   y = section("Datos del Equipo", y);
   y += 5;
-  row("Tipo Motor:", o.motorType === "2T" ? "2 Tiempos (2T)" : "4 Tiempos (4T)", 14, y);
+  row("Tipo Motor:", MOTOR_TYPE_LABELS[o.motorType] ?? o.motorType, 14, y);
   row("Marca:", o.brand, pw / 2, y);
   y += 6;
   row("Modelo:", o.model, 14, y);
