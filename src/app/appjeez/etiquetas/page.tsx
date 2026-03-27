@@ -27,6 +27,7 @@ interface ShipmentInfo {
   status_label: string | null;
   urgency: UrgencyType;
   delivery_date: string | null;
+  dispatch_date: string | null;
   thumbnail: string | null;
   item_id: string | null;
   printed_at?: string;
@@ -142,6 +143,11 @@ function ShipmentRow({ s, selected, onToggle }: {
         {/* Estado del envío */}
         <div className="mb-1.5">
           <p className="text-[11px] font-black text-white">{s.status_label ?? s.status}</p>
+          {s.dispatch_date && (
+            <p className="text-[10px] font-semibold" style={{ color: "#FF9800" }}>
+              Despachar antes del {new Date(s.dispatch_date).toLocaleDateString("es-AR", { weekday:"long", day:"numeric", month:"long" })}
+            </p>
+          )}
           {deliveryStr && (
             <p className="text-[10px]" style={{ color: "#9CA3AF" }}>
               Llega el {deliveryStr}

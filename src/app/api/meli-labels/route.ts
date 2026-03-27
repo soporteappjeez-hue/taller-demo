@@ -25,6 +25,7 @@ interface ShipmentInfo {
   status_label: string | null;
   urgency: UrgencyType;
   delivery_date: string | null;
+  dispatch_date: string | null;
   thumbnail: string | null;
   item_id: string | null;
 }
@@ -169,6 +170,7 @@ export async function GET(req: Request) {
             status_label:   statusLabel(rawStatus, type),
             urgency:        classifyUrgency(deliveryDate),
             delivery_date:  deliveryDate,
+            dispatch_date:  null,
             thumbnail:      null,
             item_id:        firstItem?.item?.id ?? null,
           });
@@ -196,16 +198,44 @@ export async function GET(req: Request) {
               if (!detail) return;
               const s = allShipments.find(x => x.shipment_id === sid);
               if (!s) return;
+
+              // Tipo correcto desde el shipment (más preciso que la orden)
               const lt = (detail.logistic_type as string | undefined) ?? "";
               const tags = (detail.tags as string[] | undefined) ?? [];
               s.type = classifyType(lt, tags);
-              const estDelivery =
-                (detail.estimated_delivery_limit as Record<string, unknown> | undefined) ??
-                ((detail.shipping_option as Record<string, unknown> | undefined)
-                  ?.estimated_delivery_limit as Record<string, unknown> | undefined);
-              if (estDelivery?.date) {
-                s.delivery_date = estDelivery.date as string;
-                s.urgency = classifyUrgency(s.delivery_date);
+
+              // Actualizar status desde el shipment
+              const shipStatus = (detail.status as string | undefined);
+              if (shipStatus) {
+                s.status = shipStatus;
+                s.status_label = statusLabel(shipStatus, s.type);
+              }
+
+              // Fecha de entrega — probar múltiples campos que usa MeLi
+              const tryDate = (obj: unknown): string | null => {
+                if (!obj || typeof obj !== "object") return null;
+                const o = obj as Record<string, unknown>;
+                return (o.date ?? o.from ?? o.to) as string | null ?? null;
+              };
+
+              const deliveryDate =
+                tryDate(detail.estimated_delivery_limit) ??
+                tryDate((detail.shipping_option as Record<string, unknown> | undefined)?.estimated_delivery_limit) ??
+                tryDate((detail.shipping_option as Record<string, unknown> | undefined)?.estimated_delivery_final) ??
+                tryDate(detail.estimated_delivery_final) ??
+                (detail.date_first_printed as string | undefined) ?? null;
+
+              if (deliveryDate) {
+                s.delivery_date = deliveryDate;
+                s.urgency = classifyUrgency(deliveryDate);
+              }
+
+              // Fecha límite de despacho por parte del vendedor
+              const dispatchLimit =
+                (detail.shipping_option as Record<string, unknown> | undefined)?.estimated_handling_limit ??
+                detail.estimated_handling_limit;
+              if (dispatchLimit && typeof dispatchLimit === "object") {
+                s.dispatch_date = ((dispatchLimit as Record<string, unknown>).date ?? null) as string | null;
               }
             } catch { /* skip */ }
           })
