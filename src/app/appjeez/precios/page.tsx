@@ -78,6 +78,7 @@ function PreciosInner() {
   const [results, setResults]           = useState<PriceResult[]>([]);
   const [summary, setSummary]           = useState<SseDone["summary"] | null>(null);
   const [error, setError]               = useState<string | null>(null);
+  const [clearCache, setClearCache]     = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -118,6 +119,7 @@ function PreciosInner() {
         adjustment_type: adjType,
         adjustment_value: Number(adjValue),
         dry_run: dry,
+        clear_cache: clearCache,
       };
       if (selectedAcc !== "all") payload.account_ids = [selectedAcc];
 
@@ -224,6 +226,20 @@ function PreciosInner() {
               Si el título contiene alguna de estas palabras, la publicación se omite aunque coincida con la clave
             </p>
           </div>
+
+          {/* Limpiar caché */}
+          <button onClick={() => setClearCache(v => !v)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+            style={{ background: clearCache ? "#EF444418" : "#121212", border: `1px solid ${clearCache ? "#EF444455" : "rgba(255,255,255,0.08)"}` }}>
+            <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border"
+              style={{ background: clearCache ? "#EF4444" : "transparent", borderColor: clearCache ? "#EF4444" : "#4B5563" }}>
+              {clearCache && <span className="text-white text-[10px] font-black">✓</span>}
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-black" style={{ color: clearCache ? "#EF4444" : "#9CA3AF" }}>Limpiar caché de esta keyword</p>
+              <p className="text-[10px]" style={{ color: "#6B7280" }}>Vuelve a revisar TODAS las publicaciones, incluso las ya escaneadas</p>
+            </div>
+          </button>
 
           {/* Tipo de ajuste */}
           <div>
