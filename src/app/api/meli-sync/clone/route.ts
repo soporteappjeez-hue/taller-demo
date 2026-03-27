@@ -155,6 +155,25 @@ export async function POST(req: Request) {
           listing_type_id:    item.listing_type_id ?? "gold_special",
         };
 
+        // Copiar sale_terms del original (garantía - requerido en Argentina)
+        const rawSaleTerms = (item.sale_terms as Array<Record<string, unknown>> | undefined) ?? [];
+        if (rawSaleTerms.length) {
+          newItem.sale_terms = rawSaleTerms
+            .filter(t => t.id)
+            .map(t => {
+              const term: Record<string, unknown> = { id: t.id };
+              if (t.value_id)   term.value_id   = t.value_id;
+              if (t.value_name) term.value_name = t.value_name;
+              return term;
+            });
+        } else {
+          // Garantía mínima por defecto si el original no la tiene
+          newItem.sale_terms = [
+            { id: "WARRANTY_TYPE",  value_name: "Garantía del vendedor" },
+            { id: "WARRANTY_TIME",  value_name: "90 días" },
+          ];
+        }
+
         if (picturePayload.length) newItem.pictures = picturePayload;
 
         // Obtener atributos requeridos de la categoría para asegurarnos de incluirlos todos
