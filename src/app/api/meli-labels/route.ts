@@ -189,7 +189,7 @@ export async function GET(req: Request) {
     });
 
     // Batch fetch de thumbnails — agrupa item_ids únicos, 20 por request
-    const uniqueItemIds = [...new Set(allShipments.map(s => s.item_id).filter(Boolean))] as string[];
+    const uniqueItemIds = Array.from(new Set(allShipments.map(s => s.item_id).filter(Boolean))) as string[];
     const thumbnailMap = new Map<string, string>();
     const firstToken = tokenCache.values().next().value as string | undefined;
     if (firstToken && uniqueItemIds.length) {
