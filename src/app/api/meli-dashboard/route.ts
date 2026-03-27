@@ -45,20 +45,26 @@ async function processAccount(acc: {
   try {
     const token   = await decrypt(acc.access_token_enc, ENC_KEY);
     const uid     = acc.meli_user_id;
-    const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+
+    // Fecha de hoy en formato Argentina (UTC-3)
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const todayFrom = `${todayStr}T00:00:00.000-03:00`;
 
     const [userData, ordersToday, shipments, itemsSearch, questions] = await Promise.all([
       meliGet(`/users/${uid}`, token),
-      meliGet(`/orders/search?seller=${uid}&order.status=paid&order.date_created.from=${todayISO}&limit=50`, token),
+      meliGet(`/orders/search?seller=${uid}&order.status=paid&order.date_created.from=${encodeURIComponent(todayFrom)}&limit=50`, token),
       meliGet(`/shipments/search?seller_id=${uid}&status=ready_to_ship&limit=1`, token),
       meliGet(`/users/${uid}/items/search?limit=1`, token),
       meliGet(`/questions/search?seller_id=${uid}&status=UNANSWERED&limit=1`, token),
     ]);
 
     const rep = userData?.seller_reputation ?? null;
-    const totalAmount = (ordersToday?.results ?? []).reduce(
+    const orders = ordersToday?.results ?? [];
+    const totalAmount = orders.reduce(
       (s: number, o: { total_amount?: number }) => s + (o.total_amount ?? 0), 0
     );
+    const todayOrdersCount = ordersToday?.paging?.total ?? orders.length;
 
     return {
       account:              acc.nickname,
@@ -67,7 +73,7 @@ async function processAccount(acc: {
       pending_messages:     0,
       ready_to_ship:        shipments?.paging?.total ?? 0,
       total_items:          itemsSearch?.paging?.total ?? 0,
-      today_orders:         ordersToday?.paging?.total ?? 0,
+      today_orders:         todayOrdersCount,
       today_sales_amount:   totalAmount,
       reputation: rep ? {
         level_id:               rep.level_id ?? null,
