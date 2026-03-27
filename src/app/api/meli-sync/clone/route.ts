@@ -157,13 +157,19 @@ export async function POST(req: Request) {
 
         if (picturePayload.length) newItem.pictures = picturePayload;
 
-        // Solo incluir atributos simples (evitar atributos con objetos complejos que rompen el POST)
+        // Incluir TODOS los atributos del item original (MeLi los requiere por categoría)
+        // Solo excluir atributos de solo lectura que MeLi rechaza en POST
         const rawAttrs = (item.attributes as Array<Record<string, unknown>> | undefined) ?? [];
-        const safeAttrs = rawAttrs.filter(a =>
-          a.id && a.value_name &&
-          typeof a.value_name === "string" &&
-          !["SELLER_SKU","ALPHANUMERIC_MODEL","ITEM_CONDITION"].includes(String(a.id))
-        ).map(a => ({ id: a.id, value_name: a.value_name }));
+        const readonlyIds = new Set(["ITEM_CONDITION","SELLER_SKU","GTIN","EAN","ISBN","UPC","ALPHANUMERIC_MODEL"]);
+        const safeAttrs = rawAttrs
+          .filter(a => a.id && !readonlyIds.has(String(a.id)))
+          .map(a => {
+            // Si tiene value_id, usarlo (más confiable que value_name)
+            if (a.value_id) return { id: a.id, value_id: a.value_id };
+            if (a.value_name) return { id: a.id, value_name: a.value_name };
+            return null;
+          })
+          .filter(Boolean);
         if (safeAttrs.length) newItem.attributes = safeAttrs;
 
         // Publicar en destino
@@ -183,11 +189,10 @@ export async function POST(req: Request) {
           results.push({ item_id: itemId, title, status: "cloned", new_id: newId });
         } else {
           const d = postRes.data as Record<string, unknown>;
-          // Extraer mensaje de error útil de MeLi
-          const cause = (d?.cause as Array<{ code: number; description: string }> | undefined)?.[0];
-          const reason = cause
-            ? `[${cause.code}] ${cause.description}`
-            : (d?.message as string | undefined) ?? `HTTP ${postRes.status}`;
+          // Extraer mensaje de error detallado de MeLi
+          const causes = (d?.cause as Array<{ code?: number; description?: string }> | undefined) ?? [];
+          const causeMsg = causes.map(c => c.description ?? String(c.code ?? "")).filter(Boolean).join("; ");
+          const reason = causeMsg || (d?.message as string | undefined) || (d?.error as string | undefined) || `HTTP ${postRes.status}`;
           results.push({ item_id: itemId, title, status: "error", reason });
         }
 
