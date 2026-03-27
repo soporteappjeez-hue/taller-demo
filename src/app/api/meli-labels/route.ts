@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 60;
 
-type UrgencyType = "delayed" | "today" | "upcoming";
+type UrgencyType = "delayed" | "today" | "tomorrow" | "week" | "upcoming";
 type LogisticType = "flex" | "turbo" | "correo" | "full";
 
 interface ShipmentInfo {
@@ -40,12 +40,13 @@ function isDatePast(dateStr: string | null): boolean {
 
 function classifyUrgency(deliveryDate: string | null): UrgencyType {
   if (!deliveryDate) return "upcoming";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(deliveryDate);
-  d.setHours(0, 0, 0, 0);
-  if (d.getTime() < today.getTime()) return "delayed";
-  if (d.getTime() === today.getTime()) return "today";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d     = new Date(deliveryDate); d.setHours(0, 0, 0, 0);
+  const diff  = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (diff < 0)  return "delayed";
+  if (diff === 0) return "today";
+  if (diff === 1) return "tomorrow";
+  if (diff <= 7)  return "week";
   return "upcoming";
 }
 
@@ -352,7 +353,7 @@ export async function GET(req: Request) {
     }
 
     // ── Separación final ──────────────────────────────────────────────────────
-    const urgencyOrder: Record<UrgencyType, number>   = { delayed: 0, today: 1, upcoming: 2 };
+    const urgencyOrder: Record<UrgencyType, number>   = { delayed: 0, today: 1, tomorrow: 2, week: 3, upcoming: 4 };
     const typeOrder:    Record<LogisticType, number>   = { correo: 0, turbo: 1, flex: 2, full: 3 };
     allShipments.sort((a, b) => {
       const ud = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
@@ -363,28 +364,31 @@ export async function GET(req: Request) {
     const pending   = allShipments.filter(s => s.type !== "full");
     const fullItems = allShipments.filter(s => s.type === "full");
 
-    // Demorados sin despachar: pending con dispatch_date pasada
+    // Demorados sin despachar: pending con dispatch_date pasada o urgency delayed
     const delayed_unshipped = pending.filter(s =>
       isDatePast(s.dispatch_date) || s.urgency === "delayed"
     );
 
+    // In-transit: todos los despachados no-full
+    const in_transit = allInTransit.filter(s => s.type !== "full");
+
     // Demorados en tránsito: ya despachados, delivery_date pasada
-    const delayed_in_transit = allInTransit.filter(s =>
-      s.type !== "full" && isDatePast(s.delivery_date)
-    );
+    const delayed_in_transit = in_transit.filter(s => isDatePast(s.delivery_date));
 
     if (action === "list") {
       return NextResponse.json({
         shipments:          pending,
         full:               fullItems,
+        in_transit,
         delayed_unshipped,
         delayed_in_transit,
         summary: {
-          correo:            pending.filter(s => s.type === "correo").length,
-          flex:              pending.filter(s => s.type === "flex").length,
-          turbo:             pending.filter(s => s.type === "turbo").length,
-          full:              fullItems.length,
-          delayed_unshipped: delayed_unshipped.length,
+          correo:             pending.filter(s => s.type === "correo").length,
+          flex:               pending.filter(s => s.type === "flex").length,
+          turbo:              pending.filter(s => s.type === "turbo").length,
+          full:               fullItems.length,
+          in_transit:         in_transit.length,
+          delayed_unshipped:  delayed_unshipped.length,
           delayed_in_transit: delayed_in_transit.length,
         },
       });

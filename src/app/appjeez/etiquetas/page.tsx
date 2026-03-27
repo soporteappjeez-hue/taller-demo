@@ -6,9 +6,9 @@ import {
   Package, Truck, Zap, AlertCircle, ChevronDown, ChevronRight, Clock,
 } from "lucide-react";
 
-type UrgencyType  = "delayed" | "today" | "upcoming";
+type UrgencyType  = "delayed" | "today" | "tomorrow" | "week" | "upcoming";
 type LogisticType = "flex" | "turbo" | "correo" | "full";
-type MainTab      = "despachar" | "full" | "demorados" | "impresas";
+type MainTab      = "despachar" | "transito" | "full" | "demorados" | "impresas";
 type HistPeriod   = "today" | "yesterday" | "week";
 
 interface ShipmentInfo {
@@ -36,11 +36,12 @@ interface ShipmentInfo {
 }
 interface Summary {
   correo: number; flex: number; turbo: number; full: number;
-  delayed_unshipped: number; delayed_in_transit: number;
+  in_transit: number; delayed_unshipped: number; delayed_in_transit: number;
 }
 interface LabelData {
   shipments:          ShipmentInfo[];
   full:               ShipmentInfo[];
+  in_transit:         ShipmentInfo[];
   delayed_unshipped:  ShipmentInfo[];
   delayed_in_transit: ShipmentInfo[];
   summary:            Summary;
@@ -48,10 +49,18 @@ interface LabelData {
 
 /* ── Colores por tipo ── */
 const TYPE_CFG: Record<LogisticType, { color: string; label: string; icon: React.ReactNode }> = {
-  correo: { color: "#FF9800", label: "CORREO",  icon: <Truck className="w-3.5 h-3.5" /> },
-  flex:   { color: "#00E5FF", label: "FLEX",    icon: <Truck className="w-3.5 h-3.5" /> },
-  turbo:  { color: "#A855F7", label: "TURBO",   icon: <Zap   className="w-3.5 h-3.5" /> },
-  full:   { color: "#FFE600", label: "FULL",    icon: <span className="text-xs">⚡</span> },
+  correo: { color: "#FF9800", label: "CORREO", icon: <Truck className="w-3.5 h-3.5" /> },
+  flex:   { color: "#00E5FF", label: "FLEX",   icon: <Truck className="w-3.5 h-3.5" /> },
+  turbo:  { color: "#A855F7", label: "TURBO",  icon: <Zap   className="w-3.5 h-3.5" /> },
+  full:   { color: "#FFE600", label: "FULL",   icon: <span className="text-xs">⚡</span> },
+};
+
+const URGENCY_CFG: Record<UrgencyType, { label: string; color: string }> = {
+  delayed:  { label: "DEMORADO",    color: "#ef4444" },
+  today:    { label: "HOY",         color: "#FF9800" },
+  tomorrow: { label: "MAÑANA",      color: "#60a5fa" },
+  week:     { label: "ESTA SEMANA", color: "#6B7280" },
+  upcoming: { label: "PRÓXIMO",     color: "#4B5563" },
 };
 
 /* ── Tarjeta de resumen ── */
@@ -89,9 +98,11 @@ function TypeBadge({ type }: { type: LogisticType }) {
 function ShipmentCard({ s, selected, onToggle, showCheckbox = true }: {
   s: ShipmentInfo; selected?: boolean; onToggle?: (id: number) => void; showCheckbox?: boolean;
 }) {
+  const urg = URGENCY_CFG[s.urgency];
   const borderColor =
-    s.urgency === "delayed" ? "#ef4444" :
-    s.urgency === "today"   ? "#FF9800" : "rgba(255,255,255,0.06)";
+    s.urgency === "delayed"  ? "#ef4444" :
+    s.urgency === "today"    ? "#FF9800" :
+    s.urgency === "tomorrow" ? "#60a5fa" : "rgba(255,255,255,0.06)";
 
   const formattedDate = s.order_date
     ? new Date(s.order_date).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -128,13 +139,11 @@ function ShipmentCard({ s, selected, onToggle, showCheckbox = true }: {
           <span className="text-[10px] flex-shrink-0" style={{ color: "#6B7280" }}>{formattedDate} hs</span>
         )}
         <TypeBadge type={s.type} />
-        {s.urgency === "delayed" && (
+        {s.urgency !== "week" && s.urgency !== "upcoming" && (
           <span className="text-[9px] font-black px-1.5 py-0.5 rounded"
-            style={{ background: "#ef444422", color: "#ef4444", border: "1px solid #ef444440" }}>DEMORADO</span>
-        )}
-        {s.urgency === "today" && (
-          <span className="text-[9px] font-black px-1.5 py-0.5 rounded"
-            style={{ background: "#FF980022", color: "#FF9800", border: "1px solid #FF980040" }}>HOY</span>
+            style={{ background: urg.color + "22", color: urg.color, border: `1px solid ${urg.color}40` }}>
+            {urg.label}
+          </span>
         )}
         <div className="ml-auto text-right flex-shrink-0">
           <p className="text-[10px] font-bold text-white leading-tight">{s.buyer}</p>
@@ -147,7 +156,7 @@ function ShipmentCard({ s, selected, onToggle, showCheckbox = true }: {
         <div className="mb-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[11px] font-black text-white">{s.status_label ?? s.status}</p>
-            {s.substatus && s.substatus !== "null" && (s.substatus === "printed" || s.substatus === "label_printed") && (
+            {(s.substatus === "printed" || s.substatus === "label_printed") && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
                 style={{ background: "#39FF1420", color: "#39FF14", border: "1px solid #39FF1440" }}>
                 ✓ Impresa en MeLi
@@ -273,6 +282,47 @@ function TypeAccordion({ type, items, selected, onToggle, onPrint, downloading, 
   );
 }
 
+/* ── Grupo de urgencia (para tab A Despachar) ── */
+function UrgencyGroup({ urgency, items, selected, onToggle, onPrint, downloading }: {
+  urgency: UrgencyType; items: ShipmentInfo[]; selected: Set<number>;
+  onToggle: (id: number) => void; onPrint: (fmt: "pdf" | "zpl", ids: number[]) => void;
+  downloading: boolean;
+}) {
+  const [open, setOpen] = useState(urgency !== "upcoming");
+  if (!items.length) return null;
+  const cfg = URGENCY_CFG[urgency];
+  const label = urgency === "delayed" ? `⚠ Sin despachar — DEMORADO (${items.length})`
+    : urgency === "today"    ? `Entregan HOY (${items.length})`
+    : urgency === "tomorrow" ? `Entregan mañana (${items.length})`
+    : urgency === "week"     ? `Esta semana (${items.length})`
+    : `Próximos (${items.length})`;
+
+  return (
+    <div className="rounded-2xl overflow-hidden mb-3"
+      style={{ background: "#161616", border: `2px solid ${cfg.color}40` }}>
+      <button className="w-full px-4 py-3 flex items-center gap-2 text-left"
+        style={{ borderBottom: open ? `1px solid ${cfg.color}20` : "none" }}
+        onClick={() => setOpen(v => !v)}>
+        <span className="font-black text-sm flex-1" style={{ color: cfg.color }}>{label}</span>
+        {open
+          ? <ChevronDown  className="w-4 h-4 flex-shrink-0" style={{ color: cfg.color }} />
+          : <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: cfg.color }} />}
+      </button>
+      {open && (
+        <div className="px-2 pt-1 pb-2 space-y-0">
+          {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
+            <TypeAccordion key={t} type={t}
+              items={items.filter(s => s.type === t)}
+              selected={selected} onToggle={onToggle}
+              onPrint={onPrint} downloading={downloading}
+              defaultOpen={urgency === "delayed" || urgency === "today"} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Página principal ── */
 function EtiquetasInner() {
   const [data,        setData]        = useState<LabelData | null>(null);
@@ -284,7 +334,6 @@ function EtiquetasInner() {
   const [downloading, setDownloading] = useState(false);
   const [mainTab,     setMainTab]     = useState<MainTab>("despachar");
   const [histPeriod,  setHistPeriod]  = useState<HistPeriod>("today");
-  const [activeType,  setActiveType]  = useState<LogisticType | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -294,7 +343,7 @@ function EtiquetasInner() {
       const d: LabelData = await res.json();
       setData(d);
       // Pre-seleccionar urgentes (demorados + hoy)
-      const urgent = (d.shipments ?? []).filter(s => s.urgency !== "upcoming");
+      const urgent = (d.shipments ?? []).filter(s => s.urgency === "delayed" || s.urgency === "today");
       setSelected(new Set(urgent.map(s => s.shipment_id)));
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -342,23 +391,21 @@ function EtiquetasInner() {
     finally { setDownloading(false); }
   }, [data, load]);
 
-  const all      = data?.shipments ?? [];
-  const fullItems = data?.full      ?? [];
-  const delayedU  = data?.delayed_unshipped  ?? [];
-  const delayedT  = data?.delayed_in_transit ?? [];
-  const summary   = data?.summary;
+  const all            = data?.shipments        ?? [];
+  const fullItems      = data?.full             ?? [];
+  const inTransit      = data?.in_transit       ?? [];
+  const delayedU       = data?.delayed_unshipped ?? [];
+  const delayedT       = data?.delayed_in_transit ?? [];
+  const summary        = data?.summary;
 
-  const pending   = all.filter(s => s.urgency !== "upcoming");
-  const upcoming  = all.filter(s => s.urgency === "upcoming");
+  const totalDemorados = delayedU.length + delayedT.length;
 
-  // Filtro por tipo activo en resumen
-  const visiblePending = activeType ? pending.filter(s => s.type === activeType) : pending;
-
-  const tabs = [
-    { id: "despachar" as MainTab, label: "A Despachar", badge: pending.length,   badgeColor: pending.filter(s=>s.urgency==="delayed").length > 0 ? "#ef4444" : "#FF9800" },
-    { id: "full"      as MainTab, label: "⚡ Full",      badge: fullItems.length, badgeColor: "#FFE600" },
-    { id: "demorados" as MainTab, label: "Demorados",   badge: delayedU.length + delayedT.length, badgeColor: "#ef4444" },
-    { id: "impresas"  as MainTab, label: "Impresas",    badge: null,             badgeColor: "#39FF14" },
+  const tabs: { id: MainTab; label: string; badge: number | null; badgeColor: string }[] = [
+    { id: "despachar", label: "A Despachar",  badge: all.length,       badgeColor: delayedU.length > 0 ? "#ef4444" : "#FF9800" },
+    { id: "transito",  label: "En Tránsito",  badge: inTransit.length, badgeColor: "#60a5fa" },
+    { id: "full",      label: "⚡ Full",       badge: fullItems.length, badgeColor: "#FFE600" },
+    { id: "demorados", label: "Demorados",    badge: totalDemorados,   badgeColor: "#ef4444" },
+    { id: "impresas",  label: "Impresas",     badge: null,             badgeColor: "#39FF14" },
   ];
 
   return (
@@ -404,29 +451,24 @@ function EtiquetasInner() {
 
         {!loading && data && (
           <>
-            {/* Tarjetas de resumen */}
+            {/* Tarjetas de resumen por tipo */}
             <div className="grid grid-cols-4 gap-2">
               {(["correo", "flex", "turbo", "full"] as LogisticType[]).map(t => (
                 <SummaryCard key={t} type={t}
                   count={t === "full" ? (summary?.full ?? 0) : (summary?.[t as "correo"|"flex"|"turbo"] ?? 0)}
-                  active={activeType === t && mainTab === "despachar"}
-                  onClick={() => {
-                    if (t === "full") { setMainTab("full"); setActiveType(null); return; }
-                    setMainTab("despachar");
-                    setActiveType(prev => prev === t ? null : t);
-                  }} />
+                  onClick={() => setMainTab(t === "full" ? "full" : "despachar")} />
               ))}
             </div>
 
             {/* Alerta demorados */}
-            {(delayedU.length > 0 || delayedT.length > 0) && mainTab !== "demorados" && (
+            {totalDemorados > 0 && mainTab !== "demorados" && (
               <button onClick={() => setMainTab("demorados")}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left"
                 style={{ background: "#ef444415", border: "1px solid #ef444440" }}>
                 <AlertCircle className="w-5 h-5 flex-shrink-0" style={{ color: "#ef4444" }} />
                 <div>
                   <p className="text-sm font-black" style={{ color: "#ef4444" }}>
-                    {delayedU.length + delayedT.length} envío{delayedU.length+delayedT.length>1?"s":""} demorado{delayedU.length+delayedT.length>1?"s":""}
+                    {totalDemorados} envío{totalDemorados > 1 ? "s" : ""} demorado{totalDemorados > 1 ? "s" : ""}
                   </p>
                   <p className="text-[10px]" style={{ color: "#9CA3AF" }}>
                     {delayedU.length} sin despachar · {delayedT.length} en tránsito retrasado
@@ -463,48 +505,20 @@ function EtiquetasInner() {
             {/* ══ TAB A DESPACHAR ══ */}
             {mainTab === "despachar" && (
               <>
-                {activeType && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: TYPE_CFG[activeType].color }}>
-                      Filtrando: {TYPE_CFG[activeType].label}
-                    </span>
-                    <button onClick={() => setActiveType(null)}
-                      className="text-xs px-2 py-0.5 rounded-lg"
-                      style={{ background: "rgba(255,255,255,0.08)", color: "#9CA3AF" }}>
-                      Ver todos
-                    </button>
-                  </div>
-                )}
-                {visiblePending.length === 0 && upcoming.length === 0 ? (
+                {all.length === 0 ? (
                   <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
                     <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: "#39FF14" }} />
                     <p className="text-white font-bold text-sm">¡Todo al día!</p>
-                    <p className="text-xs mt-1" style={{ color: "#6B7280" }}>Sin envíos urgentes pendientes</p>
+                    <p className="text-xs mt-1" style={{ color: "#6B7280" }}>Sin envíos pendientes</p>
                   </div>
                 ) : (
                   <>
-                    {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
-                      <TypeAccordion key={t} type={t}
-                        items={visiblePending.filter(s => s.type === t)}
+                    {(["delayed", "today", "tomorrow", "week", "upcoming"] as UrgencyType[]).map(urg => (
+                      <UrgencyGroup key={urg} urgency={urg}
+                        items={all.filter(s => s.urgency === urg)}
                         selected={selected} onToggle={toggleItem}
                         onPrint={handlePrint} downloading={downloading} />
                     ))}
-                    {upcoming.filter(s => !activeType || s.type === activeType).length > 0 && (
-                      <details className="rounded-2xl overflow-hidden"
-                        style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.06)" }}>
-                        <summary className="px-4 py-3 cursor-pointer font-bold text-sm flex items-center gap-2"
-                          style={{ color: "#6B7280" }}>
-                          <Clock className="w-4 h-4" />
-                          Próximos días ({upcoming.filter(s => !activeType || s.type === activeType).length})
-                        </summary>
-                        <div className="px-2 pt-1 pb-2">
-                          {upcoming.filter(s => !activeType || s.type === activeType).map(s => (
-                            <ShipmentCard key={s.shipment_id} s={s}
-                              selected={selected.has(s.shipment_id)} onToggle={toggleItem} />
-                          ))}
-                        </div>
-                      </details>
-                    )}
                     <p className="text-[10px] text-center pt-1" style={{ color: "#4B5563" }}>
                       Al imprimir, los envíos se mueven a Impresas automáticamente
                     </p>
@@ -513,10 +527,56 @@ function EtiquetasInner() {
               </>
             )}
 
+            {/* ══ TAB EN TRÁNSITO ══ */}
+            {mainTab === "transito" && (
+              <div className="space-y-0">
+                {/* Demorados en tránsito primero */}
+                {delayedT.length > 0 && (
+                  <div className="rounded-2xl overflow-hidden mb-3"
+                    style={{ background: "#161616", border: "2px solid #ef444440" }}>
+                    <div className="px-4 py-3" style={{ borderBottom: "1px solid #ef444430" }}>
+                      <p className="font-black text-sm flex items-center gap-2" style={{ color: "#ef4444" }}>
+                        <AlertCircle className="w-4 h-4" />
+                        Con retraso en entrega ({delayedT.length})
+                      </p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "#9CA3AF" }}>
+                        Ya despachados — la demora es del correo. Podés gestionar un reclamo a MeLi.
+                      </p>
+                    </div>
+                    <div className="px-2 pt-1 pb-2">
+                      {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
+                        <TypeAccordion key={t} type={t}
+                          items={delayedT.filter(s => s.type === t)}
+                          readOnly defaultOpen />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* En tránsito normales */}
+                {inTransit.filter(s => !delayedT.find(d => d.shipment_id === s.shipment_id)).length > 0 && (
+                  <>
+                    <p className="text-xs font-bold px-1 pb-1" style={{ color: "#60a5fa" }}>
+                      En camino — en término ({inTransit.filter(s => !delayedT.find(d => d.shipment_id === s.shipment_id)).length})
+                    </p>
+                    {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
+                      <TypeAccordion key={t} type={t}
+                        items={inTransit.filter(s => s.type === t && !delayedT.find(d => d.shipment_id === s.shipment_id))}
+                        readOnly defaultOpen={false} />
+                    ))}
+                  </>
+                )}
+                {inTransit.length === 0 && (
+                  <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
+                    <Truck className="w-8 h-8 mx-auto mb-2" style={{ color: "#6B7280" }} />
+                    <p className="text-white font-bold text-sm">Sin envíos en tránsito</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ══ TAB FULL ══ */}
             {mainTab === "full" && (
               <div className="space-y-3">
-                {/* Banner informativo */}
                 <div className="rounded-2xl p-5 text-center"
                   style={{ background: "#FFE60010", border: "2px solid #FFE60030" }}>
                   <span className="text-5xl block mb-2">⚡</span>
@@ -532,11 +592,7 @@ function EtiquetasInner() {
                     <p className="text-white font-bold text-sm">Sin envíos Full pendientes</p>
                   </div>
                 ) : (
-                  <div className="space-y-0">
-                    {fullItems.map(s => (
-                      <ShipmentCard key={s.shipment_id} s={s} showCheckbox={false} />
-                    ))}
-                  </div>
+                  fullItems.map(s => <ShipmentCard key={s.shipment_id} s={s} showCheckbox={false} />)
                 )}
               </div>
             )}
@@ -544,7 +600,6 @@ function EtiquetasInner() {
             {/* ══ TAB DEMORADOS ══ */}
             {mainTab === "demorados" && (
               <div className="space-y-3">
-                {/* Sin despachar */}
                 {delayedU.length > 0 && (
                   <div className="rounded-2xl overflow-hidden"
                     style={{ background: "#161616", border: "2px solid #ef444440" }}>
@@ -554,29 +609,19 @@ function EtiquetasInner() {
                         Sin Despachar ({delayedU.length})
                       </p>
                       <p className="text-[10px] mt-0.5" style={{ color: "#9CA3AF" }}>
-                        El paquete está en tu local — buscarlo y despacharlo urgente
+                        El paquete está en tu local — buscar y despachar urgente
                       </p>
                     </div>
                     <div className="px-2 pt-1 pb-2">
-                      {delayedU.map(s => (
-                        <ShipmentCard key={s.shipment_id} s={s}
-                          selected={selected.has(s.shipment_id)} onToggle={toggleItem} />
+                      {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
+                        <TypeAccordion key={t} type={t}
+                          items={delayedU.filter(s => s.type === t)}
+                          selected={selected} onToggle={toggleItem}
+                          onPrint={handlePrint} downloading={downloading} />
                       ))}
-                    </div>
-                    <div className="px-3 pb-3">
-                      <button
-                        onClick={() => handlePrint("pdf", delayedU.filter(s => selected.has(s.shipment_id)).map(s => s.shipment_id))}
-                        disabled={delayedU.filter(s => selected.has(s.shipment_id)).length === 0 || downloading}
-                        className="w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 disabled:opacity-30"
-                        style={{ background: "#ef4444", color: "#fff" }}>
-                        <Printer className="w-3.5 h-3.5" />
-                        Imprimir Demorados Seleccionados ({delayedU.filter(s => selected.has(s.shipment_id)).length})
-                      </button>
                     </div>
                   </div>
                 )}
-
-                {/* En tránsito retrasado */}
                 {delayedT.length > 0 && (
                   <div className="rounded-2xl overflow-hidden"
                     style={{ background: "#161616", border: "2px solid #FF980040" }}>
@@ -586,18 +631,19 @@ function EtiquetasInner() {
                         En Tránsito con Retraso ({delayedT.length})
                       </p>
                       <p className="text-[10px] mt-0.5" style={{ color: "#9CA3AF" }}>
-                        Ya despachados — la demora es del correo. Podés gestionar un reclamo a MeLi.
+                        Ya despachados — la demora es del correo.
                       </p>
                     </div>
                     <div className="px-2 pt-1 pb-2">
-                      {delayedT.map(s => (
-                        <ShipmentCard key={s.shipment_id} s={s} showCheckbox={false} />
+                      {(["correo", "flex", "turbo"] as LogisticType[]).map(t => (
+                        <TypeAccordion key={t} type={t}
+                          items={delayedT.filter(s => s.type === t)}
+                          readOnly />
                       ))}
                     </div>
                   </div>
                 )}
-
-                {delayedU.length === 0 && delayedT.length === 0 && (
+                {totalDemorados === 0 && (
                   <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
                     <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: "#39FF14" }} />
                     <p className="text-white font-bold text-sm">Sin envíos demorados</p>
@@ -609,7 +655,6 @@ function EtiquetasInner() {
             {/* ══ TAB IMPRESAS ══ */}
             {mainTab === "impresas" && (
               <div className="space-y-3">
-                {/* Filtro de período */}
                 <div className="flex gap-2">
                   {(["today", "yesterday", "week"] as HistPeriod[]).map(p => (
                     <button key={p} onClick={() => setHistPeriod(p)}
@@ -645,11 +690,36 @@ function EtiquetasInner() {
                         items={history.filter(s => s.type === t)}
                         readOnly defaultOpen={false} />
                     ))}
+                    {/* Full impresas — informativo */}
+                    {history.filter(s => s.type === "full").length > 0 && (
+                      <div className="rounded-2xl overflow-hidden"
+                        style={{ background: "#161616", border: "1px solid #FFE60025" }}>
+                        <div className="px-4 py-3 flex items-center gap-2">
+                          <span className="text-base">⚡</span>
+                          <span className="font-black text-sm" style={{ color: "#FFE600" }}>FULL</span>
+                          <span className="text-xs font-black px-2 py-0.5 rounded-full"
+                            style={{ background: "#FFE60020", color: "#FFE600" }}>
+                            {history.filter(s => s.type === "full").length}
+                          </span>
+                          <span className="text-[10px] ml-1" style={{ color: "#6B7280" }}>
+                            (gestionados por MeLi)
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
             )}
           </>
+        )}
+
+        {/* Estado vacío inicial */}
+        {!loading && !data && !error && (
+          <div className="rounded-2xl p-10 text-center" style={{ background: "#1A1A1A" }}>
+            <Clock className="w-8 h-8 mx-auto mb-2" style={{ color: "#6B7280" }} />
+            <p className="text-white font-bold text-sm">Sin datos</p>
+          </div>
         )}
       </div>
     </main>
