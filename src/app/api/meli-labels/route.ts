@@ -212,7 +212,8 @@ export async function GET(req: Request) {
           if (seenPending.has(sid) || printedSet.has(sid)) continue;
           seenPending.add(sid);
 
-          const forceFull = fullIds.has(sid) && !readyIds.has(sid) && !handlingIds.has(sid);
+          // Si el shipment aparece en la query dedicada de fulfillment → siempre Full
+          const forceFull = fullIds.has(sid);
           const info = parseOrder(order, acc, forceFull);
           if (info) allShipments.push(info);
         }
