@@ -196,11 +196,12 @@ export async function GET(req: Request) {
       for (let i = 0; i < uniqueItemIds.length; i += 20) {
         const batch = uniqueItemIds.slice(i, i + 20);
         try {
-          const res = await meliGet(`/items?ids=${batch.join(",")}&attributes=id,thumbnail`, firstToken) as Array<{ code: number; body?: { id: string; thumbnail?: string } }> | null;
+          const res = await meliGet(`/items?ids=${batch.join(",")}&attributes=id,thumbnail,secure_thumbnail`, firstToken) as Array<{ code: number; body?: { id: string; thumbnail?: string; secure_thumbnail?: string } }> | null;
           if (Array.isArray(res)) {
             for (const entry of res) {
-              if (entry.code === 200 && entry.body?.id && entry.body.thumbnail) {
-                thumbnailMap.set(entry.body.id, entry.body.thumbnail);
+              if (entry.code === 200 && entry.body?.id) {
+                const img = entry.body.secure_thumbnail || entry.body.thumbnail;
+                if (img) thumbnailMap.set(entry.body.id, img);
               }
             }
           }
