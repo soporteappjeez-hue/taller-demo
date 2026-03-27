@@ -174,14 +174,30 @@ function QuestionCard({ q, onAnswered }: { q: Question; onAnswered: (id: number)
   const [sending, setSending] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
+  const FIRMA = "Atte.: MaqJeez de Carlos Spegazzini Ezeiza";
+
   async function handleSend() {
     if (!text.trim()) return;
+
+    let finalText = text.trim();
+    if (!finalText.endsWith(FIRMA)) {
+      finalText = finalText + "\n\n" + FIRMA;
+    }
+
+    if (finalText.length > 2000) {
+      setError("El mensaje es demasiado largo para incluir la firma. Por favor, acorta el texto.");
+      return;
+    }
+
+    setText(finalText);
+    await new Promise(r => setTimeout(r, 300));
+
     setSending(true); setError(null);
     try {
       const res = await fetch("/api/meli-answer", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ question_id: q.meli_question_id, answer_text: text, meli_account_id: q.meli_account_id }),
+        body:    JSON.stringify({ question_id: q.meli_question_id, answer_text: finalText, meli_account_id: q.meli_account_id }),
       });
       const data = await res.json();
       if (data.status === "ok") {
