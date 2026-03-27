@@ -157,19 +157,40 @@ export async function POST(req: Request) {
 
         if (picturePayload.length) newItem.pictures = picturePayload;
 
-        // Incluir TODOS los atributos del item original (MeLi los requiere por categoría)
-        // Solo excluir atributos de solo lectura que MeLi rechaza en POST
+        // Obtener atributos requeridos de la categoría para asegurarnos de incluirlos todos
+        const catAttrsData = await meliGet(`/categories/${item.category_id}/attributes`, originToken);
+        const requiredAttrIds = new Set<string>(
+          ((catAttrsData ?? []) as Array<{ id: string; tags?: { required?: boolean } }>)
+            .filter(a => a.tags?.required)
+            .map(a => a.id)
+        );
+
+        // Incluir TODOS los atributos del item original con formato completo
         const rawAttrs = (item.attributes as Array<Record<string, unknown>> | undefined) ?? [];
-        const readonlyIds = new Set(["ITEM_CONDITION","SELLER_SKU","GTIN","EAN","ISBN","UPC","ALPHANUMERIC_MODEL"]);
+        const readonlyIds = new Set(["ITEM_CONDITION","SELLER_SKU","GTIN","EAN","ISBN","UPC"]);
         const safeAttrs = rawAttrs
           .filter(a => a.id && !readonlyIds.has(String(a.id)))
           .map(a => {
-            // Si tiene value_id, usarlo (más confiable que value_name)
-            if (a.value_id) return { id: a.id, value_id: a.value_id };
-            if (a.value_name) return { id: a.id, value_name: a.value_name };
-            return null;
+            const attr: Record<string, unknown> = { id: a.id };
+            if (a.value_id)   attr.value_id   = a.value_id;
+            if (a.value_name) attr.value_name = a.value_name;
+            // Para atributos con múltiples valores
+            if (Array.isArray(a.values) && (a.values as unknown[]).length) {
+              attr.value_id   = (a.values as Array<{ id?: string; name?: string }>)[0]?.id   ?? a.value_id;
+              attr.value_name = (a.values as Array<{ id?: string; name?: string }>)[0]?.name ?? a.value_name;
+            }
+            return attr;
           })
-          .filter(Boolean);
+          .filter(a => a.value_id || a.value_name);
+
+        // Verificar que todos los atributos requeridos están cubiertos
+        const coveredIds = new Set(safeAttrs.map(a => String(a.id)));
+        const missingRequired = Array.from(requiredAttrIds).filter(id => !coveredIds.has(id));
+        if (missingRequired.length) {
+          results.push({ item_id: itemId, title, status: "error", reason: `Atributos requeridos faltantes: ${missingRequired.join(", ")}` });
+          continue;
+        }
+
         if (safeAttrs.length) newItem.attributes = safeAttrs;
 
         // Publicar en destino
