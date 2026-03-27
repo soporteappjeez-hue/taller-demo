@@ -150,10 +150,24 @@ export async function POST(req: Request) {
           price:              item.price,
           currency_id:        item.currency_id ?? "ARS",
           available_quantity: (item.available_quantity as number) > 0 ? item.available_quantity : 1,
-          buying_mode:        "buy_it_now",
+          buying_mode:        item.buying_mode ?? "buy_it_now",
           condition:          item.condition ?? "new",
           listing_type_id:    item.listing_type_id ?? "gold_special",
         };
+
+        // Copiar configuración de envío del original
+        const shipping = item.shipping as Record<string, unknown> | undefined;
+        if (shipping) {
+          // Solo copiar los campos relevantes, no datos de tracking/orden
+          const shippingPayload: Record<string, unknown> = {};
+          if (shipping.mode)             shippingPayload.mode           = shipping.mode;
+          if (shipping.local_pick_up !== undefined) shippingPayload.local_pick_up = shipping.local_pick_up;
+          if (shipping.free_shipping !== undefined) shippingPayload.free_shipping = shipping.free_shipping;
+          if (Array.isArray(shipping.methods) && (shipping.methods as unknown[]).length) {
+            shippingPayload.methods = shipping.methods;
+          }
+          if (Object.keys(shippingPayload).length) newItem.shipping = shippingPayload;
+        }
 
         // Copiar sale_terms del original (garantía - requerido en Argentina)
         const rawSaleTerms = (item.sale_terms as Array<Record<string, unknown>> | undefined) ?? [];
@@ -167,7 +181,6 @@ export async function POST(req: Request) {
               return term;
             });
         } else {
-          // Garantía mínima por defecto si el original no la tiene
           newItem.sale_terms = [
             { id: "WARRANTY_TYPE",  value_name: "Garantía del vendedor" },
             { id: "WARRANTY_TIME",  value_name: "90 días" },
@@ -240,9 +253,7 @@ export async function POST(req: Request) {
             return String(c);
           }).join(" | ");
           const reason = causeMsg
-            || (d?.message as string | undefined)
-            || (d?.error as string | undefined)
-            || `HTTP ${postRes.status}: ${JSON.stringify(d).slice(0, 300)}`;
+            || `${d?.message ?? d?.error ?? "error"} | payload_keys:${Object.keys(newItem).join(",")} | meli_resp:${JSON.stringify(d).slice(0, 400)}`;
           results.push({ item_id: itemId, title, status: "error", reason });
         }
 
