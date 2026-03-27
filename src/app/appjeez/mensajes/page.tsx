@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft, RefreshCw, MessageCircle, Send, Clock,
   CheckCircle2, AlertCircle, ChevronDown, ChevronUp,
   Search, Package, Settings, Plus, Trash2, Edit2, Check, X,
+  Bell, BellOff, Volume2,
 } from "lucide-react";
 
 const DEFAULT_TEMPLATES = [
@@ -321,6 +322,44 @@ function MensajesInner() {
   const [lastSync, setLastSync]   = useState<Date | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [newCount, setNewCount]   = useState(0);
+  const [toast, setToast]         = useState<string | null>(null);
+  const alertedIdsRef = useRef<Set<number>>(new Set());
+  const audioRef      = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdHuMk42Bfn6Dj5yWjIB7fIOQm5eSh3t2fImWmpOJf3t8iJabl46DfXuFk5qXj4R9fIOSmZWNhH19hZOZl4+EfX2Ek5mXj4R9fYWTmZePhH19hJOZl4+EfX2Fk5mXj4R9fYSTmZePhH19hZOZl4+EfX2Ek5mVjYR+fYWTmJWOhH59hZOYlY6Efn2Fk5iVjoR+fYWTl5SNhH59hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6GkpaUjYR+foaSg3xtZnF+i5OPh4F9gIuWlY6DfHyEkpmXjoN8fISSmZeOg3x8hJKZl46DfHyEkpmXjoN8fISSmZeOg3x8hJKZlo2Dfn6Gk5aUjYR+fg==");
+    audioRef.current.volume = 0.7;
+  }, []);
+
+  const playAlert = useCallback(() => {
+    if (!alertsEnabled || !audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch(() => {});
+  }, [alertsEnabled]);
+
+  const enableAlerts = () => {
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        audioRef.current!.pause();
+        audioRef.current!.currentTime = 0;
+        setAlertsEnabled(true);
+      }).catch(() => {
+        setAlertsEnabled(true);
+      });
+    } else {
+      setAlertsEnabled(true);
+    }
+  };
+
+  const testSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
   const load = useCallback(async (sync = false) => {
     if (sync) setSyncing(true); else setLoading(true);
     setError(null);
@@ -329,13 +368,30 @@ function MensajesInner() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: Question[] = await res.json();
 
-      // Deduplicar por meli_question_id en el frontend también
       const seen = new Set<number>();
       const unique = data.filter(q => {
         if (seen.has(q.meli_question_id)) return false;
         seen.add(q.meli_question_id);
         return true;
       });
+
+      let newQuestions = 0;
+      const newAccounts: string[] = [];
+      for (const q of unique) {
+        if (!alertedIdsRef.current.has(q.meli_question_id)) {
+          alertedIdsRef.current.add(q.meli_question_id);
+          newQuestions++;
+          const accName = q.meli_accounts?.nickname ?? "Cuenta";
+          if (!newAccounts.includes(accName)) newAccounts.push(accName);
+        }
+      }
+
+      if (newQuestions > 0 && sync) {
+        setNewCount(newQuestions);
+        playAlert();
+        setToast(`${newQuestions} pregunta${newQuestions > 1 ? "s" : ""} nueva${newQuestions > 1 ? "s" : ""} de ${newAccounts.join(", ")}`);
+        setTimeout(() => setToast(null), 5000);
+      }
 
       setQuestions(unique);
       setLastSync(new Date());
@@ -344,11 +400,11 @@ function MensajesInner() {
     } finally {
       setLoading(false); setSyncing(false);
     }
-  }, []);
+  }, [playAlert]);
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => load(true), 60_000);
+    const interval = setInterval(() => load(true), 300_000);
     return () => clearInterval(interval);
   }, [load]);
 
@@ -380,11 +436,30 @@ function MensajesInner() {
             </h1>
             <p className="text-[10px]" style={{ color: "#6B7280" }}>
               {lastSync ? `Sync ${lastSync.toLocaleTimeString("es-AR")}` : "Cargando..."}
-              {" · "}<Clock className="w-3 h-3 inline" /> auto cada 1min
+              {" · "}<Clock className="w-3 h-3 inline" /> auto cada 5min
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {alertsEnabled ? (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setAlertsEnabled(false)}
+                className="flex items-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold"
+                style={{ background: "#39FF1418", color: "#39FF14", border: "1px solid #39FF1433" }}>
+                <Bell className="w-4 h-4" />
+              </button>
+              <button onClick={testSound}
+                className="p-2 rounded-xl" style={{ background: "#1F1F1F" }}>
+                <Volume2 className="w-3.5 h-3.5 text-gray-400" />
+              </button>
+            </div>
+          ) : (
+            <button onClick={enableAlerts}
+              className="flex items-center gap-1.5 px-2 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: "#1F1F1F", color: "#6B7280", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <BellOff className="w-4 h-4" />
+            </button>
+          )}
           <button onClick={() => setShowTemplates(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
             style={{ background: "#1F1F1F", color: "#00E5FF", border: "1px solid #00E5FF33" }}>
@@ -474,6 +549,25 @@ function MensajesInner() {
           </div>
         )}
       </div>
+
+      {/* Toast de preguntas nuevas */}
+      {toast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold shadow-xl animate-bounce"
+          style={{ background: "#FF5722", color: "white" }}>
+          <Bell className="w-4 h-4" />
+          {toast}
+        </div>
+      )}
+
+      {/* Badge de nuevas */}
+      {newCount > 0 && !toast && (
+        <div className="fixed bottom-20 right-4 z-50">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white animate-pulse"
+            style={{ background: "#FF5722", boxShadow: "0 0 20px rgba(255,87,34,0.5)" }}>
+            {newCount}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
