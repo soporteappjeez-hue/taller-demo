@@ -153,6 +153,9 @@ export async function POST(req: Request) {
           listing_type_id:    item.listing_type_id ?? "gold_special",
         };
 
+        // family_name requerido por MeLi en ciertas categorías
+        if (item.family_name) newItem.family_name = item.family_name;
+
         // Copiar configuración de envío del original
         const shipping = item.shipping as Record<string, unknown> | undefined;
         if (shipping) {
