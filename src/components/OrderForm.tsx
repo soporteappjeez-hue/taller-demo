@@ -6,12 +6,13 @@ import {
   MotorType,
   RepairStatus,
   ClientNotification,
+  ExtraMachine,
   MOTOR_TYPE_LABELS,
   REPAIR_STATUS_LABELS,
   CLIENT_NOTIFICATION_LABELS,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { X, Save, User, Phone, Wrench, DollarSign, ClipboardList, Clock, Camera } from "lucide-react";
+import { X, Save, User, Phone, Wrench, DollarSign, ClipboardList, Clock, Camera, PlusCircle, Trash2 } from "lucide-react";
 import PhotoUpload from "@/components/PhotoUpload";
 
 interface OrderFormProps {
@@ -65,6 +66,24 @@ export default function OrderForm({ initial, onSave, onClose }: OrderFormProps) 
   );
   const [errors, setErrors] = useState<Partial<Record<keyof WorkOrder, string>>>({});
 
+  // ── Máquinas adicionales ──────────────────────────────────────
+  const [extraMachines, setExtraMachines] = useState<ExtraMachine[]>(
+    initial?.extraMachines ?? []
+  );
+
+  const addMachine = () =>
+    setExtraMachines(prev => [...prev, {
+      id: generateId(), motorType: "desmalezadora",
+      brand: "", model: "", reportedIssues: "",
+    }]);
+
+  const removeMachine = (id: string) =>
+    setExtraMachines(prev => prev.filter(m => m.id !== id));
+
+  const setMachine = (id: string, key: keyof ExtraMachine, val: string) =>
+    setExtraMachines(prev => prev.map(m => m.id === id ? { ...m, [key]: val } : m));
+  // ─────────────────────────────────────────────────────────────
+
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -107,6 +126,7 @@ export default function OrderForm({ initial, onSave, onClose }: OrderFormProps) 
       ...form,
       completionDate,
       deliveryDate,
+      extraMachines,
     });
   };
 
@@ -260,6 +280,56 @@ export default function OrderForm({ initial, onSave, onClose }: OrderFormProps) 
                 onChange={(e) => set("internalNotes", e.target.value)}
               />
             </div>
+          </section>
+
+
+          {/* Maquinas Adicionales */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="flex items-center gap-2 text-orange-400 font-bold text-sm uppercase tracking-wider">
+                <PlusCircle className="w-4 h-4" /> Maquinas Adicionales
+                {extraMachines.length > 0 && (
+                  <span className="ml-1 bg-orange-500 text-white text-xs font-black rounded-full px-2 py-0.5">{extraMachines.length}</span>
+                )}
+              </h3>
+              <button type="button" onClick={addMachine}
+                className="flex items-center gap-1.5 text-xs font-black px-3 py-2 rounded-xl"
+                style={{ background: "#1e3a1e", color: "#4ade80", border: "1px solid #166534" }}>
+                <PlusCircle className="w-3.5 h-3.5" /> + Agregar maquina
+              </button>
+            </div>
+            {extraMachines.length === 0 && (
+              <p className="text-xs text-gray-600 text-center py-3 rounded-xl border border-dashed border-gray-700">
+                Cliente con mas de una maquina? Presi el boton verde
+              </p>
+            )}
+            {extraMachines.map((m, idx) => (
+              <div key={m.id} className="rounded-xl p-4 mb-3 space-y-3" style={{ background: "#111827", border: "1px solid #374151" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-orange-400">Maquina #{idx + 2}</span>
+                  <button type="button" onClick={() => removeMachine(m.id)} className="p-1 rounded-lg text-red-400 hover:bg-red-900/30">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div>
+                  <label className="label">Tipo</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["desmalezadora","motosierra","grupo_electrogeno","otros"] as MotorType[]).map(t => (
+                      <button key={t} type="button" onClick={() => setMachine(m.id, "motorType", t)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${m.motorType===t?"bg-orange-500 border-orange-500 text-white":"bg-gray-800 border-gray-700 text-gray-400 hover:text-white"}`}>
+                        {MOTOR_TYPE_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
+                  {m.motorType==="otros" && (<input type="text" placeholder="Especifica el tipo..." value={m.machineTypeOther??""} onChange={e=>setMachine(m.id,"machineTypeOther",e.target.value)} className="input mt-2"/>)}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="label">Marca</label><input type="text" placeholder="Ej: Stihl" value={m.brand} onChange={e=>setMachine(m.id,"brand",e.target.value)} className="input"/></div>
+                  <div><label className="label">Modelo</label><input type="text" placeholder="Ej: MS 250" value={m.model} onChange={e=>setMachine(m.id,"model",e.target.value)} className="input"/></div>
+                </div>
+                <div><label className="label">Falla</label><textarea rows={2} placeholder="Falla reportada..." value={m.reportedIssues} onChange={e=>setMachine(m.id,"reportedIssues",e.target.value)} className="input resize-none"/></div>
+              </div>
+            ))}
           </section>
 
           {/* Gestión económica */}

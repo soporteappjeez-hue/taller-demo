@@ -18,6 +18,15 @@ export type ClientNotification =
   | "avisado"
   | "sin_respuesta";
 
+export interface ExtraMachine {
+  id: string;
+  motorType: MotorType;
+  machineTypeOther?: string;
+  brand: string;
+  model: string;
+  reportedIssues: string;
+}
+
 export interface WorkOrder {
   id: string;
   // Datos del cliente
@@ -47,6 +56,8 @@ export interface WorkOrder {
   internalNotes: string;
   // Fotos
   photoUrls: string[];
+  // Máquinas adicionales del mismo cliente
+  extraMachines?: ExtraMachine[];
   // Pagos
   totalPaid?: number;
 }

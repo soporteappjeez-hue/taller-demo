@@ -104,6 +104,11 @@ export default function OrderCard({ order, onEdit, onDelete }: OrderCardProps) {
                 ? `: ${(currentOrder as WorkOrder & { machineTypeOther?: string }).machineTypeOther}`
                 : ""}
             </span>
+            {currentOrder.extraMachines && currentOrder.extraMachines.length > 0 && (
+              <span className="text-xs font-black px-2 py-0.5 rounded-lg border bg-green-500/20 text-green-400 border-green-500/40">
+                +{currentOrder.extraMachines.length} maq.
+              </span>
+            )}
             <span className={`badge ${REPAIR_STATUS_COLORS[currentOrder.status]}`}>
               {REPAIR_STATUS_LABELS[currentOrder.status]}
             </span>
