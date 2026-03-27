@@ -131,7 +131,7 @@ export async function POST(req: Request) {
           listing_type_id:    item.listing_type_id ?? "gold_special",
         };
 
-        if (item.family_name) newItem.family_name = item.family_name;
+        // family_name NO se incluye — MeLi lo rechaza con "field invalid" en la cuenta destino
 
         const shipping = item.shipping as Record<string, unknown> | undefined;
         if (shipping) {
@@ -202,11 +202,9 @@ export async function POST(req: Request) {
 
         if (!postRes.ok) {
           const errStr = JSON.stringify(postRes.data ?? {});
+          // Retry sin título si MeLi lo rechaza
           if (errStr.includes("title") && errStr.includes("invalid")) {
             delete newItem.title;
-            postRes = await meliPost("/items", destToken, newItem);
-          } else if (errStr.includes("family_name") && !newItem.family_name) {
-            newItem.family_name = item.family_name ?? title;
             postRes = await meliPost("/items", destToken, newItem);
           }
         }
@@ -224,22 +222,12 @@ export async function POST(req: Request) {
           results.push({ item_id: itemId, title, status: "cloned", new_id: newId });
         } else {
           const d = postRes.data as Record<string, unknown>;
-          const rawCauses = (d?.cause ?? []) as unknown[];
-          const causeMsg = rawCauses.map(c => {
-            if (typeof c === "string") return c;
-            if (typeof c === "object" && c !== null) {
-              const o = c as Record<string, unknown>;
-              return o.description ?? o.code ?? JSON.stringify(o);
-            }
-            return String(c);
-          }).join(" | ");
-          const reason = [
-            causeMsg,
-            d?.message as string | undefined,
-            `keys:[${Object.keys(newItem).join(",")}]`,
-            `resp:${JSON.stringify(d).slice(0, 400)}`
-          ].filter(Boolean).join(" | ");
-          results.push({ item_id: itemId, title, status: "error", reason });
+          // Extraer mensaje de error legible desde la respuesta de MeLi
+          const causes = (d?.cause ?? []) as Array<Record<string, unknown>>;
+          const causeMsg = causes.length
+            ? causes.map(c => c.description ?? c.message ?? c.code ?? JSON.stringify(c)).join("; ")
+            : (d?.message as string | undefined) ?? `HTTP ${postRes.status}`;
+          results.push({ item_id: itemId, title, status: "error", reason: causeMsg });
         }
 
         await new Promise(r => setTimeout(r, 250));
