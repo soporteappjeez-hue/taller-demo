@@ -344,6 +344,7 @@ function AppJeezInner() {
   const navItems = [
     { label: "Dashboard",       icon: <BarChart2 className="w-4 h-4" />,       href: "/appjeez",               active: true  },
     { label: "Mensajería",      icon: <MessageCircle className="w-4 h-4" />,   href: "/appjeez/mensajes",      active: false },
+    { label: "Envíos",          icon: <Truck className="w-4 h-4" />,           href: "/appjeez/envios",        active: false },
     { label: "Publicaciones",   icon: <Package className="w-4 h-4" />,         href: "/appjeez/publicaciones", active: false },
     { label: "Órdenes",         icon: <ShoppingCart className="w-4 h-4" />,    href: "/appjeez/ordenes",       active: false },
     { label: "Cuentas MeLi",    icon: <Store className="w-4 h-4" />,           href: "/configuracion/meli",    active: false },
