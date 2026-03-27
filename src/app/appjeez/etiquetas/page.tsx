@@ -82,8 +82,9 @@ function EtiquetasInner() {
     if (!selected.size) return;
     setDownloading(true);
     try {
-      const ids = Array.from(selected).join(",");
-      const res = await fetch(`/api/meli-labels?action=download&format=${format}&ids=${ids}`);
+      const ids = Array.from(selected);
+      const idsStr = ids.join(",");
+      const res = await fetch(`/api/meli-labels?action=download&format=${format}&ids=${idsStr}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
@@ -99,12 +100,19 @@ function EtiquetasInner() {
         a.click();
       }
       URL.revokeObjectURL(url);
+
+      await fetch("/api/meli-labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shipment_ids: ids }),
+      });
+      load();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setDownloading(false);
     }
-  }, [selected]);
+  }, [selected, load]);
 
   return (
     <main className="min-h-screen pb-24" style={{ background: "#121212" }}>

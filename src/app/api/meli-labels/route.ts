@@ -71,6 +71,10 @@ export async function GET(req: Request) {
 
     if (!accounts?.length) return NextResponse.json({ shipments: [], summary: {} });
 
+    // Obtener etiquetas ya impresas para filtrarlas
+    const { data: printed } = await supabase.from("meli_printed_labels").select("shipment_id");
+    const printedSet = new Set((printed ?? []).map((p: { shipment_id: number }) => p.shipment_id));
+
     const allShipments: ShipmentInfo[] = [];
 
     await Promise.all(accounts.map(async (acc) => {
@@ -86,6 +90,7 @@ export async function GET(req: Request) {
         for (const order of orders) {
           const ship = order.shipping as Record<string, unknown> | undefined;
           if (!ship?.id) continue;
+          if (printedSet.has(ship.id as number)) continue;
 
           const logistic = (ship.logistic_type as string | undefined) ?? "";
           let type: "flex" | "turbo" | "correo" = "correo";
@@ -210,6 +215,21 @@ export async function GET(req: Request) {
       },
     });
 
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { shipment_ids } = await req.json() as { shipment_ids: number[] };
+    if (!shipment_ids?.length) {
+      return NextResponse.json({ error: "No shipment_ids" }, { status: 400 });
+    }
+    const supabase = createClient(SUPA_URL, SERVICE_KEY);
+    const rows = shipment_ids.map(id => ({ shipment_id: id }));
+    await supabase.from("meli_printed_labels").upsert(rows, { onConflict: "shipment_id" });
+    return NextResponse.json({ ok: true, marked: shipment_ids.length });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
