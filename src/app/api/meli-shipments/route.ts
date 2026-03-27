@@ -34,10 +34,11 @@ async function meliGet(path: string, token: string) {
   } catch { return null; }
 }
 
-function classifyLogistic(type: string | null | undefined): "flex" | "full" | "correo" {
+function classifyLogistic(type: string | null | undefined): "flex" | "turbo" | "full" | "correo" {
   if (!type) return "correo";
   const t = type.toLowerCase();
   if (t === "flex") return "flex";
+  if (t === "turbo" || t === "self_service_turbo" || t.includes("turbo")) return "turbo";
   if (t === "fulfillment") return "full";
   return "correo";
 }
@@ -72,23 +73,26 @@ export async function GET() {
       .eq("status", "active")
       .order("nickname", { ascending: true });
 
-    if (error || !accounts?.length) return NextResponse.json({ ready: [], upcoming: [], full_count: 0 });
+    if (error || !accounts?.length) return NextResponse.json({ ready: [], upcoming: [], full_count: 0, turbo_count: 0 });
 
     const ready:    object[] = [];
     const upcoming: object[] = [];
-    let   fullCount = 0;
+    let   fullCount  = 0;
+    let   turboCount = 0;
 
     await Promise.all(accounts.map(async (acc) => {
       try {
         const token = await decrypt(acc.access_token_enc, ENC_KEY);
 
-        const [readyShip, handlingShip, fullOrders] = await Promise.all([
+        const [readyShip, handlingShip, fullOrders, turboOrders] = await Promise.all([
           meliGet(`/shipments/search?seller_id=${acc.meli_user_id}&status=ready_to_ship&limit=50`, token),
           meliGet(`/shipments/search?seller_id=${acc.meli_user_id}&status=handling&limit=50`, token),
           meliGet(`/orders/search?seller=${acc.meli_user_id}&order.status=paid&shipping.logistic_type=fulfillment&limit=1`, token),
+          meliGet(`/shipments/search?seller_id=${acc.meli_user_id}&logistic_type=turbo&status=handling&limit=1`, token),
         ]);
 
-        fullCount += fullOrders?.paging?.total ?? 0;
+        fullCount  += fullOrders?.paging?.total  ?? 0;
+        turboCount += turboOrders?.paging?.total ?? 0;
 
         const toItem = (s: MeliShipment, listType: "ready" | "upcoming") => {
           const logType = classifyLogistic(s.logistic_type);
@@ -132,7 +136,7 @@ export async function GET() {
     ready.sort(sortFn);
     upcoming.sort(sortFn);
 
-    return NextResponse.json({ ready, upcoming, full_count: fullCount });
+    return NextResponse.json({ ready, upcoming, full_count: fullCount, turbo_count: turboCount });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

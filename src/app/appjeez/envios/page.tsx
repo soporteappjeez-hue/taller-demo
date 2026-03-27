@@ -13,7 +13,7 @@ interface Shipment {
   order_id:        number | null;
   account:         string;
   logistic_type:   string;
-  type:            "flex" | "correo" | "full";
+  type:            "flex" | "turbo" | "correo" | "full";
   substatus:       string | null;
   tracking_number: string | null;
   date_created:    string | null;
@@ -27,6 +27,7 @@ interface ShipmentsData {
   ready:       Shipment[];
   upcoming:    Shipment[];
   full_count:  number;
+  turbo_count: number;
 }
 
 const URGENCY_CONFIG = {
@@ -47,8 +48,10 @@ function timeUntil(date: string | null) {
 }
 
 function ShipmentCard({ s }: { s: Shipment }) {
-  const isFlex  = s.type === "flex";
-  const typeColor = isFlex ? "#00E5FF" : "#FF9800";
+  const isFlex   = s.type === "flex";
+  const isTurbo  = s.type === "turbo";
+  const typeColor = isFlex ? "#00E5FF" : isTurbo ? "#A855F7" : "#FF9800";
+  const typeLabel = isFlex ? "FLEX" : isTurbo ? "TURBO" : "CORREO";
   const urg     = URGENCY_CONFIG[s.urgency];
   const UrgIcon = urg.icon;
   const until   = timeUntil(s.shipping_limit);
@@ -67,7 +70,7 @@ function ShipmentCard({ s }: { s: Shipment }) {
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
               style={{ background: typeColor, color: "#121212" }}>
-              {isFlex ? "FLEX" : "CORREO"}
+              {typeLabel}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: "#FFE60018", color: "#FFE600" }}>
@@ -113,9 +116,9 @@ function ShipmentCard({ s }: { s: Shipment }) {
   );
 }
 
-type TabType = "ready" | "upcoming" | "full";
+type TabType = "ready" | "upcoming" | "full" | "turbo";
 
-function filterByType(list: Shipment[], type: "flex" | "correo" | "all") {
+function filterByType(list: Shipment[], type: "flex" | "turbo" | "correo" | "all") {
   if (type === "all") return list;
   return list.filter(s => s.type === type);
 }
@@ -125,7 +128,7 @@ function EnviosInner() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [tab, setTab]           = useState<TabType>("ready");
-  const [typeFilter, setTypeFilter] = useState<"flex" | "correo" | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<"flex" | "turbo" | "correo" | "all">("all");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -140,8 +143,8 @@ function EnviosInner() {
   useEffect(() => { load(); }, [load]);
 
   const currentList = filterByType(
-    tab === "ready" ? (data?.ready ?? []) : (data?.upcoming ?? []),
-    typeFilter
+    (tab === "ready" || tab === "turbo") ? (data?.ready ?? []) : (data?.upcoming ?? []),
+    tab === "turbo" ? "turbo" : typeFilter
   );
 
   const readyCount    = filterByType(data?.ready    ?? [], typeFilter).length;
@@ -182,28 +185,34 @@ function EnviosInner() {
 
         {/* Resumen */}
         {data && !loading && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             <div className="rounded-2xl p-3 text-center"
               style={{ background: "#39FF1412", border: "1px solid #39FF1433" }}>
               <p className="text-2xl font-black" style={{ color: "#39FF14" }}>{data.ready.length}</p>
-              <p className="text-[11px] font-bold text-white mt-0.5">Listos</p>
+              <p className="text-[10px] font-bold text-white mt-0.5">Listos</p>
             </div>
             <div className="rounded-2xl p-3 text-center"
               style={{ background: "#FF980012", border: "1px solid #FF980033" }}>
               <p className="text-2xl font-black" style={{ color: "#FF9800" }}>{data.upcoming.length}</p>
-              <p className="text-[11px] font-bold text-white mt-0.5">Próximos</p>
+              <p className="text-[10px] font-bold text-white mt-0.5">Próximos</p>
+            </div>
+            <div className="rounded-2xl p-3 text-center"
+              style={{ background: "#A855F712", border: "1px solid #A855F733" }}>
+              <p className="text-2xl font-black" style={{ color: "#A855F7" }}>{data.turbo_count}</p>
+              <p className="text-[10px] font-bold text-white mt-0.5">Turbo</p>
             </div>
             <div className="rounded-2xl p-3 text-center"
               style={{ background: "#FFE60012", border: "1px solid #FFE60033" }}>
               <p className="text-2xl font-black" style={{ color: "#FFE600" }}>{data.full_count}</p>
-              <p className="text-[11px] font-bold text-white mt-0.5">Full MeLi</p>
+              <p className="text-[10px] font-bold text-white mt-0.5">Full MeLi</p>
             </div>
           </div>
         )}
 
         {/* Filtro tipo */}
+        {tab !== "turbo" && (
         <div className="flex gap-2">
-          {([["all","Todos"],["flex","🚴 Flex"],["correo","📦 Correo"]] as const).map(([v, label]) => (
+          {([["all","Todos"],["flex","🚴 Flex"],["turbo","🚀 Turbo"],["correo","📦 Correo"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => setTypeFilter(v)}
               className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
               style={typeFilter === v
@@ -213,25 +222,33 @@ function EnviosInner() {
             </button>
           ))}
         </div>
+        )}
 
-        {/* Tabs Listos / Próximos / Full */}
-        <div className="flex gap-2">
+        {/* Tabs Listos / Próximos / Turbo / Full */}
+        <div className="flex gap-1.5 flex-wrap">
           <button onClick={() => setTab("ready")}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
             style={tab === "ready"
               ? { background: "#39FF14", color: "#121212" }
               : { background: "#1F1F1F", color: "#6B7280" }}>
             Listos {data ? `(${readyCount})` : ""}
           </button>
           <button onClick={() => setTab("upcoming")}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
             style={tab === "upcoming"
               ? { background: "#FF9800", color: "#121212" }
               : { background: "#1F1F1F", color: "#6B7280" }}>
             Próximos {data ? `(${upcomingCount})` : ""}
           </button>
+          <button onClick={() => setTab("turbo")}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
+            style={tab === "turbo"
+              ? { background: "#A855F7", color: "#ffffff" }
+              : { background: "#1F1F1F", color: "#6B7280" }}>
+            🚀 Turbo {data ? `(${data.turbo_count})` : ""}
+          </button>
           <button onClick={() => setTab("full")}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
             style={tab === "full"
               ? { background: "#FFE600", color: "#121212" }
               : { background: "#1F1F1F", color: "#6B7280" }}>
@@ -268,8 +285,8 @@ function EnviosInner() {
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2" style={{ color: "#39FF14" }} />
                 <p className="text-white font-bold">Sin envíos pendientes</p>
                 <p className="text-xs mt-1" style={{ color: "#6B7280" }}>
-                  No hay envíos {tab === "ready" ? "listos" : "próximos"}
-                  {typeFilter !== "all" ? ` de tipo ${typeFilter}` : ""}
+                  No hay envíos {tab === "ready" ? "listos" : tab === "turbo" ? "turbo" : "próximos"}
+                  {tab !== "turbo" && typeFilter !== "all" ? ` de tipo ${typeFilter}` : ""}
                 </p>
               </div>
             ) : (
