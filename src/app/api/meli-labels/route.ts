@@ -85,17 +85,27 @@ export async function GET(req: Request) {
           `/orders/search?seller=${acc.meli_user_id}&order.status=paid&sort=date_desc&limit=50&shipping.status=ready_to_ship`,
           token
         );
-        const orders = (data?.results ?? []) as Array<Record<string, unknown>>;
+        const dataHandling = await meliGet(
+          `/orders/search?seller=${acc.meli_user_id}&order.status=paid&sort=date_desc&limit=50&shipping.status=handling`,
+          token
+        );
+        const orders = [
+          ...((data?.results ?? []) as Array<Record<string, unknown>>),
+          ...((dataHandling?.results ?? []) as Array<Record<string, unknown>>),
+        ];
+        const seen = new Set<number>();
 
         for (const order of orders) {
           const ship = order.shipping as Record<string, unknown> | undefined;
           if (!ship?.id) continue;
-          if (printedSet.has(ship.id as number)) continue;
+          const sid = ship.id as number;
+          if (seen.has(sid) || printedSet.has(sid)) continue;
+          seen.add(sid);
 
           const logistic = (ship.logistic_type as string | undefined) ?? "";
           let type: "flex" | "turbo" | "correo" = "correo";
-          if (logistic.includes("flex")) type = "flex";
-          else if (logistic.includes("turbo") || logistic.includes("self_service")) type = "turbo";
+          if (logistic === "self_service" || logistic.includes("flex")) type = "flex";
+          else if (logistic.includes("fulfillment")) type = "turbo";
 
           const items = (order.order_items as Array<{ item?: { title?: string } }> | undefined) ?? [];
           const buyer = order.buyer as Record<string, unknown> | undefined;
