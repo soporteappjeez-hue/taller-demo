@@ -22,6 +22,8 @@ interface MeliItemPreview {
   thumbnail:          string | null;
   status:             string;
   permalink:          string;
+  category_id?:       string;
+  category_name?:     string;
 }
 interface AccountInfo { id: string; nickname: string; total: number; }
 interface CompareData {
@@ -29,9 +31,11 @@ interface CompareData {
   dest:           AccountInfo;
   can_clone:      MeliItemPreview[];
   already_exists: MeliItemPreview[];
+  filter_applied: { category_ids: string[]; count: number } | null;
   summary:        { origin_total: number; dest_total: number; can_clone: number; already_exists: number };
 }
 interface Account { id: string; nickname: string; meli_user_id: string; }
+interface CategoryOption { id: string; name: string; count: number; }
 interface ErrorEntry {
   item_id:      string;
   title:        string;
@@ -40,6 +44,19 @@ interface ErrorEntry {
   suggestion:   string;
 }
 interface SyncSummary { cloned: number; skipped: number; errors: number; }
+
+function downloadErrorCSV(errors: ErrorEntry[]) {
+  if (!errors.length) return;
+  const header = "ID Original,Título,Motivo,Sugerencia\n";
+  const rows = errors.map(e =>
+    `"${e.item_id}","${(e.title ?? "").replace(/"/g, '""')}","${e.reason_human}","${e.suggestion}"`
+  ).join("\n");
+  const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = `errores-sync-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
 
 function ItemRow({
   item, selected, onToggle,
@@ -68,6 +85,11 @@ function ItemRow({
         <p className="text-[10px] mt-0.5" style={{ color: "#6B7280" }}>
           {fmt(item.price)} · Stock: {item.available_quantity} · Vendidos: {item.sold_quantity}
         </p>
+        {item.category_name && (
+          <p className="text-[10px] mt-0.5 font-semibold" style={{ color: "#FFE600" }}>
+            {item.category_name}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -82,6 +104,12 @@ function SyncInner() {
   const [compareError, setCompareError] = useState<string | null>(null);
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const [search,      setSearch]      = useState("");
+
+  // ---- Category filter ----
+  const [categories,        setCategories]        = useState<CategoryOption[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [selectedCats,      setSelectedCats]      = useState<Set<string>>(new Set());
+  const [showCatFilter,     setShowCatFilter]     = useState(false);
 
   // ---- Auto-sync SSE state ----
   const [autoSyncing,  setAutoSyncing]  = useState(false);
@@ -244,17 +272,36 @@ function SyncInner() {
   };
 
   // ---- Manual compare/clone (existing) ----
+  const loadCategories = useCallback((accId: string) => {
+    if (!accId) { setCategories([]); setSelectedCats(new Set()); return; }
+    setLoadingCategories(true);
+    fetch(`/api/meli-sync/categories?account_id=${accId}`)
+      .then(r => r.json())
+      .then((d: CategoryOption[]) => {
+        if (Array.isArray(d)) {
+          setCategories(d);
+          setSelectedCats(new Set(d.map(c => c.id))); // all selected by default
+          setShowCatFilter(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCategories(false));
+  }, []);
+
   const handleCompare = useCallback(async () => {
     if (!originId || !destId || originId === destId) return;
     setComparing(true); setCompareData(null); setCompareError(null);
     setSelected(new Set());
     try {
-      const res = await fetch(`/api/meli-sync/compare?origin_id=${originId}&dest_id=${destId}`);
+      const catParam = selectedCats.size > 0 && selectedCats.size < categories.length
+        ? `&category_ids=${Array.from(selectedCats).join(",")}`
+        : "";
+      const res = await fetch(`/api/meli-sync/compare?origin_id=${originId}&dest_id=${destId}${catParam}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCompareData(await res.json());
     } catch (e) { setCompareError((e as Error).message); }
     finally { setComparing(false); }
-  }, [originId, destId]);
+  }, [originId, destId, selectedCats, categories.length]);
 
   const toggleItem = (id: string) => {
     setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -457,7 +504,11 @@ function SyncInner() {
               <label className="text-xs font-bold mb-1.5 block" style={{ color: "#6B7280" }}>CUENTA ORIGEN (de donde se copian)</label>
               <select
                 value={originId}
-                onChange={e => { setOriginId(e.target.value); setCompareData(null); }}
+                onChange={e => {
+                    const v = e.target.value;
+                    setOriginId(v); setCompareData(null);
+                    loadCategories(v);
+                  }}
                 className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold text-white"
                 style={{ background: "#121212", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <option value="">— Seleccionar cuenta origen —</option>
@@ -489,6 +540,77 @@ function SyncInner() {
             </div>
           </div>
 
+          {/* Category filter */}
+          {originId && (
+            <div className="rounded-xl overflow-hidden" style={{ background: "#121212", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <button
+                onClick={() => setShowCatFilter(s => !s)}
+                className="w-full flex items-center justify-between px-3 py-2.5">
+                <span className="text-xs font-bold" style={{ color: "#6B7280" }}>
+                  FILTRAR POR CATEGORÍA (opcional)
+                  {selectedCats.size < categories.length && selectedCats.size > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px]"
+                      style={{ background: "#FFE60020", color: "#FFE600" }}>
+                      {selectedCats.size}/{categories.length} selec.
+                    </span>
+                  )}
+                </span>
+                {loadingCategories
+                  ? <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ color: "#6B7280" }} />
+                  : showCatFilter
+                    ? <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                }
+              </button>
+              {showCatFilter && categories.length > 0 && (
+                <div className="px-3 pb-3 space-y-2">
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={() => setSelectedCats(new Set(categories.map(c => c.id)))}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg"
+                      style={{ background: "#FFE60018", color: "#FFE600" }}>Todas</button>
+                    <button onClick={() => setSelectedCats(new Set())}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg"
+                      style={{ background: "#1a1a1a", color: "#6B7280" }}>Ninguna</button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {categories.map(cat => (
+                      <label key={cat.id}
+                        className="flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-all"
+                        style={{
+                          background: selectedCats.has(cat.id) ? "#FFE60008" : "transparent",
+                          border: `1px solid ${selectedCats.has(cat.id) ? "#FFE60030" : "rgba(255,255,255,0.04)"}`,
+                        }}>
+                        <div
+                          className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-all"
+                          style={{
+                            borderColor: selectedCats.has(cat.id) ? "#FFE600" : "#4B5563",
+                            background:  selectedCats.has(cat.id) ? "#FFE600" : "transparent",
+                          }}>
+                          {selectedCats.has(cat.id) && <CheckCircle2 className="w-2.5 h-2.5 text-black" />}
+                        </div>
+                        <input type="checkbox" className="hidden"
+                          checked={selectedCats.has(cat.id)}
+                          onChange={() => setSelectedCats(prev => {
+                            const next = new Set(prev);
+                            next.has(cat.id) ? next.delete(cat.id) : next.add(cat.id);
+                            return next;
+                          })} />
+                        <span className="flex-1 text-xs text-white">{cat.name}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: "#1F1F1F", color: "#9CA3AF" }}>
+                          {cat.count}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {showCatFilter && categories.length === 0 && !loadingCategories && (
+                <p className="px-3 pb-3 text-xs" style={{ color: "#6B7280" }}>No se encontraron categorías.</p>
+              )}
+            </div>
+          )}
+
           <button
             onClick={handleCompare}
             disabled={!originId || !destId || originId === destId || comparing}
@@ -496,7 +618,9 @@ function SyncInner() {
             style={{ background: "#FFE600", color: "#121212" }}>
             {comparing
               ? <span className="flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" /> Analizando publicaciones...</span>
-              : "Analizar y Comparar"}
+              : selectedCats.size < categories.length && selectedCats.size > 0
+                ? `Analizar — ${selectedCats.size} categoría(s) seleccionada(s)`
+                : "Analizar y Comparar"}
           </button>
         </div>
 
