@@ -188,30 +188,50 @@ export async function GET(req: Request) {
       return ud !== 0 ? ud : typeOrder[a.type] - typeOrder[b.type];
     });
 
-    // Batch fetch de thumbnails — agrupa item_ids únicos, 20 por request
-    const uniqueItemIds = Array.from(new Set(allShipments.map(s => s.item_id).filter(Boolean))) as string[];
+    // Batch fetch de thumbnails — agrupa item_ids por cuenta y usa el token correcto
     const thumbnailMap = new Map<string, string>();
-    const firstToken = tokenCache.values().next().value as string | undefined;
-    if (firstToken && uniqueItemIds.length) {
-      for (let i = 0; i < uniqueItemIds.length; i += 20) {
-        const batch = uniqueItemIds.slice(i, i + 20);
-        try {
-          const res = await meliGet(`/items?ids=${batch.join(",")}&attributes=id,thumbnail,secure_thumbnail`, firstToken) as Array<{ code: number; body?: { id: string; thumbnail?: string; secure_thumbnail?: string } }> | null;
-          if (Array.isArray(res)) {
-            for (const entry of res) {
-              if (entry.code === 200 && entry.body?.id) {
-                const img = entry.body.secure_thumbnail || entry.body.thumbnail;
-                if (img) thumbnailMap.set(entry.body.id, img);
+    // Agrupar item_ids por meli_user_id para usar el token correcto de cada cuenta
+    const itemsByAccount = new Map<string, { token: string; itemIds: string[] }>();
+    for (const s of allShipments) {
+      if (!s.item_id) continue;
+      const userId = s.meli_user_id;
+      const token = tokenCache.get(userId);
+      if (!token) continue;
+      if (!itemsByAccount.has(userId)) {
+        itemsByAccount.set(userId, { token, itemIds: [] });
+      }
+      const entry = itemsByAccount.get(userId)!;
+      if (!entry.itemIds.includes(s.item_id)) {
+        entry.itemIds.push(s.item_id);
+      }
+    }
+    // Fetch thumbnails por cuenta con su propio token
+    await Promise.all(
+      Array.from(itemsByAccount.values()).map(async ({ token, itemIds }) => {
+        for (let i = 0; i < itemIds.length; i += 20) {
+          const batch = itemIds.slice(i, i + 20);
+          try {
+            const res = await meliGet(
+              `/items?ids=${batch.join(",")}&attributes=id,thumbnail,secure_thumbnail`,
+              token
+            ) as Array<{ code: number; body?: { id: string; thumbnail?: string; secure_thumbnail?: string } }> | null;
+            if (Array.isArray(res)) {
+              for (const entry of res) {
+                if (entry.code === 200 && entry.body?.id) {
+                  const img = entry.body.secure_thumbnail || entry.body.thumbnail;
+                  if (img) thumbnailMap.set(entry.body.id, img);
+                }
               }
             }
-          }
-        } catch { /* skip thumbnails */ }
-        if (i + 20 < uniqueItemIds.length) await new Promise(r => setTimeout(r, 150));
-      }
-      for (const s of allShipments) {
-        if (s.item_id && thumbnailMap.has(s.item_id)) {
-          s.thumbnail = thumbnailMap.get(s.item_id)!;
+          } catch { /* skip thumbnails for this batch */ }
+          if (i + 20 < itemIds.length) await new Promise(r => setTimeout(r, 150));
         }
+      })
+    );
+    // Asignar thumbnails a los envíos
+    for (const s of allShipments) {
+      if (s.item_id && thumbnailMap.has(s.item_id)) {
+        s.thumbnail = thumbnailMap.get(s.item_id)!;
       }
     }
 
