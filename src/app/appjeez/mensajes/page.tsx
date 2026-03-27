@@ -327,6 +327,7 @@ function MensajesInner() {
   const [toast, setToast]         = useState<string | null>(null);
   const alertedIdsRef = useRef<Set<number>>(new Set());
   const audioRef      = useRef<HTMLAudioElement | null>(null);
+  const workerRef     = useRef<Worker | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdHuMk42Bfn6Dj5yWjIB7fIOQm5eSh3t2fImWmpOJf3t8iJabl46DfXuFk5qXj4R9fIOSmZWNhH19hZOZl4+EfX2Ek5mXj4R9fYWTmZePhH19hJOZl4+EfX2Fk5mXj4R9fYSTmZePhH19hZOZl4+EfX2Ek5mVjYR+fYWTmJWOhH59hZOYlY6Efn2Fk5iVjoR+fYWTl5SNhH59hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6GkpaUjYR+foaSg3xtZnF+i5OPh4F9gIuWlY6DfHyEkpmXjoN8fISSmZeOg3x8hJKZl46DfHyEkpmXjoN8fISSmZeOg3x8hJKZlo2Dfn6Gk5aUjYR+fg==");
@@ -404,8 +405,22 @@ function MensajesInner() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => load(true), 300_000);
-    return () => clearInterval(interval);
+
+    // Web Worker para que el polling funcione en segundo plano
+    if (typeof Worker !== "undefined") {
+      const worker = new Worker("/question-worker.js");
+      workerRef.current = worker;
+      worker.onmessage = () => load(true);
+      worker.postMessage("start");
+      return () => {
+        worker.postMessage("stop");
+        worker.terminate();
+      };
+    } else {
+      // Fallback para entornos sin Worker
+      const interval = setInterval(() => load(true), 300_000);
+      return () => clearInterval(interval);
+    }
   }, [load]);
 
   const handleAnswered = (id: number) => {
