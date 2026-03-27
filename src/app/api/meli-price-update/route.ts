@@ -69,7 +69,7 @@ async function meliGetWithRetry(path: string, token: string, signal?: AbortSigna
   return null;
 }
 
-async function getAllItemIds(userId: string, token: string, status: string, signal?: AbortSignal): Promise<string[]> {
+async function fetchIdsByStatus(userId: string, token: string, status: string, signal?: AbortSignal): Promise<string[]> {
   const ids: string[] = [];
   let offset = 0;
   const limit = 100;
@@ -89,6 +89,20 @@ async function getAllItemIds(userId: string, token: string, status: string, sign
     await new Promise(r => setTimeout(r, 180));
   }
   return ids;
+}
+
+async function getAllItemIds(userId: string, token: string, signal?: AbortSignal): Promise<string[]> {
+  // Busca en TODOS los estados para no perder ninguna publicación
+  const statuses = ["active", "paused", "under_review", "not_yet_active"];
+  const arrays = await Promise.all(statuses.map(s => fetchIdsByStatus(userId, token, s, signal)));
+  const seen = new Set<string>();
+  const all: string[] = [];
+  for (const arr of arrays) {
+    for (const id of arr) {
+      if (!seen.has(id)) { seen.add(id); all.push(id); }
+    }
+  }
+  return all;
 }
 
 interface ItemDetail {
@@ -183,11 +197,10 @@ export async function POST(req: Request) {
 
         await send({ type: "account_start", account: acc.nickname });
 
-        const [activeIds, pausedIds] = await Promise.all([
-          getAllItemIds(String(acc.meli_user_id), token, "active",  signal),
-          getAllItemIds(String(acc.meli_user_id), token, "paused",  signal),
+        const [activeIds] = await Promise.all([
+          getAllItemIds(String(acc.meli_user_id), token, signal),
         ]);
-        const allIds = [...activeIds, ...pausedIds];
+        const allIds = activeIds;
         totalScanned += allIds.length;
 
         const idsToCheck = allIds.filter(id => {
