@@ -40,6 +40,21 @@ export async function POST(req: Request) {
       try {
         let jobId: string;
         let checkpoint: Record<string, unknown> = {};
+        let dbAvailable = true; // se pone en false si sync_jobs no existe
+
+        // Helper para operaciones DB que pueden fallar silenciosamente
+        const dbUpdate = async (id: string, data: Record<string, unknown>) => {
+          if (!dbAvailable || id === "local") return;
+          try { await supabase.from("sync_jobs").update({ ...data, updated_at: new Date().toISOString() }).eq("id", id); }
+          catch { /* DB unavailable */ }
+        };
+        const dbCheckStatus = async (id: string): Promise<string | null> => {
+          if (!dbAvailable || id === "local") return null;
+          try {
+            const { data } = await supabase.from("sync_jobs").select("status").eq("id", id).single();
+            return (data?.status as string | null) ?? null;
+          } catch { return null; }
+        };
 
         if (resume_job_id) {
           const { data: job } = await supabase
@@ -53,7 +68,7 @@ export async function POST(req: Request) {
           }
           jobId = job.id as string;
           checkpoint = (job.checkpoint ?? {}) as Record<string, unknown>;
-          await supabase.from("sync_jobs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", jobId);
+          await dbUpdate(jobId, { status: "running" });
         } else {
           const { data: job, error } = await supabase
             .from("sync_jobs")
@@ -66,10 +81,13 @@ export async function POST(req: Request) {
             .select("id")
             .single();
           if (error || !job) {
-            send("error", { message: "Error al crear job en DB" });
-            clearInterval(pingInterval); controller.close(); return;
+            // Tabla sync_jobs no existe todavía — continuar sin persistencia
+            dbAvailable = false;
+            jobId = "local";
+            send("log", { msg: "⚠️ Nota: ejecutá sync-jobs.sql en Supabase para habilitar Stop/Resume. Continuando sin checkpoint..." });
+          } else {
+            jobId = (job as { id: string }).id;
           }
-          jobId = (job as { id: string }).id;
         }
 
         send("jobId", { job_id: jobId });
@@ -82,7 +100,7 @@ export async function POST(req: Request) {
 
         if (!accounts || accounts.length < 2) {
           send("error", { message: "Se necesitan al menos 2 cuentas activas" });
-          await supabase.from("sync_jobs").update({ status: "error" }).eq("id", jobId);
+          await dbUpdate(jobId, { status: "error" });
           clearInterval(pingInterval); controller.close(); return;
         }
 
@@ -92,7 +110,7 @@ export async function POST(req: Request) {
           const dst  = accounts.find(a => a.id === dest_id) as MeliAccount | undefined;
           if (!orig || !dst) {
             send("error", { message: "Cuentas no encontradas" });
-            await supabase.from("sync_jobs").update({ status: "error" }).eq("id", jobId);
+            await dbUpdate(jobId, { status: "error" });
             clearInterval(pingInterval); controller.close(); return;
           }
           // Validate tokens
@@ -100,7 +118,7 @@ export async function POST(req: Request) {
           const [originToken, destToken] = await Promise.all([getValidToken(orig), getValidToken(dst)]);
           if (!originToken || !destToken) {
             send("error", { message: "Token expirado. Reconectá las cuentas en Configuración." });
-            await supabase.from("sync_jobs").update({ status: "error" }).eq("id", jobId);
+            await dbUpdate(jobId, { status: "error" });
             clearInterval(pingInterval); controller.close(); return;
           }
           send("log", { msg: `✓ Tokens activos. Clonando ${item_ids.length} publicación(es) de ${orig.nickname} → ${dst.nickname}` });
@@ -110,14 +128,13 @@ export async function POST(req: Request) {
 
           const BATCH = 20;
           for (let batchStart = 0; batchStart < item_ids.length; batchStart += BATCH) {
-            const { data: js } = await supabase.from("sync_jobs").select("status").eq("id", jobId).single();
-            if (js?.status === "stopping") {
-              await supabase.from("sync_jobs").update({
+            const statusNow = await dbCheckStatus(jobId);
+            if (statusNow === "stopping") {
+              await dbUpdate(jobId, {
                 status: "paused",
                 checkpoint: { item_ids_remaining: item_ids.slice(batchStart) },
                 summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
-                updated_at: new Date().toISOString(),
-              }).eq("id", jobId);
+              });
               send("stopped", { job_id: jobId, summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors } });
               clearInterval(pingInterval); controller.close(); return;
             }
@@ -158,13 +175,12 @@ export async function POST(req: Request) {
             send("progress", { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors });
           }
 
-          await supabase.from("sync_jobs").update({
+          await dbUpdate(jobId, {
             status: "done",
             checkpoint: {},
             summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
             error_log: allErrors,
-            updated_at: new Date().toISOString(),
-          }).eq("id", jobId);
+          });
 
           send("log", { msg: "=== CLONACIÓN MANUAL COMPLETA ===" });
           send("log", { msg: `Clonadas: ${totalCloned} | Omitidas: ${totalSkipped} | Errores: ${totalErrors}` });
@@ -238,14 +254,13 @@ export async function POST(req: Request) {
           }
 
           // Check stop signal
-          const { data: js } = await supabase.from("sync_jobs").select("status").eq("id", jobId).single();
-          if (js?.status === "stopping") {
-            await supabase.from("sync_jobs").update({
+          const statusNow = await dbCheckStatus(jobId);
+          if (statusNow === "stopping") {
+            await dbUpdate(jobId, {
               status: "paused",
               checkpoint: { pairs_done: Array.from(pairsDone) },
               summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
-              updated_at: new Date().toISOString(),
-            }).eq("id", jobId);
+            });
             send("stopped", { job_id: jobId, summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors } });
             clearInterval(pingInterval); controller.close(); return;
           }
@@ -301,15 +316,14 @@ export async function POST(req: Request) {
           const BATCH = 20;
           for (let batchStart = 0; batchStart < remaining.length; batchStart += BATCH) {
             // Check stop signal every batch
-            const { data: js2 } = await supabase.from("sync_jobs").select("status").eq("id", jobId).single();
-            if (js2?.status === "stopping") {
+            const batchStatus = await dbCheckStatus(jobId);
+            if (batchStatus === "stopping") {
               const itemsDone = remaining.slice(0, batchStart).map(i => i.id);
-              await supabase.from("sync_jobs").update({
+              await dbUpdate(jobId, {
                 status: "paused",
                 checkpoint: { pairs_done: Array.from(pairsDone), current_pair: pairKey, items_done: itemsDone },
                 summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
-                updated_at: new Date().toISOString(),
-              }).eq("id", jobId);
+              });
               send("stopped", { job_id: jobId, summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors } });
               clearInterval(pingInterval); controller.close(); return;
             }
@@ -354,21 +368,19 @@ export async function POST(req: Request) {
           }
 
           pairsDone.add(pairKey);
-          await supabase.from("sync_jobs").update({
+          await dbUpdate(jobId, {
             checkpoint: { pairs_done: Array.from(pairsDone) },
             summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
-            updated_at: new Date().toISOString(),
-          }).eq("id", jobId);
+          });
         }
 
         // Done!
-        await supabase.from("sync_jobs").update({
+        await dbUpdate(jobId, {
           status: "done",
           checkpoint: {},
           summary: { cloned: totalCloned, skipped: totalSkipped, errors: totalErrors },
           error_log: allErrors,
-          updated_at: new Date().toISOString(),
-        }).eq("id", jobId);
+        });
 
         send("log", { msg: "=== SINCRONIZACIÓN COMPLETA ===" });
         send("log", { msg: `Clonadas: ${totalCloned} | Omitidas: ${totalSkipped} | Errores: ${totalErrors}` });
