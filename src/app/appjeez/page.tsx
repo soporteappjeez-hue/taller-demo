@@ -305,8 +305,8 @@ function AccountPanel({ data, defaultOpen, editingNick, editNickVal, setEditingN
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { label: "Ver preguntas",    color: "#FF5722", href: `/appjeez/mensajes`, icon: <MessageCircle className="w-4 h-4" />, badge: data.unanswered_questions },
-                { label: "Ver ventas",       color: "#39FF14", href: `/appjeez/ordenes`,       icon: <ShoppingCart className="w-4 h-4" /> },
-                { label: "Ver envíos",       color: "#00E5FF", href: `/appjeez/ordenes`,       icon: <Truck className="w-4 h-4" /> },
+                { label: "Estadísticas",     color: "#39FF14", href: `/appjeez/estadisticas`,  icon: <TrendingUp className="w-4 h-4" /> },
+                { label: "Ver etiquetas",    color: "#00E5FF", href: `/appjeez/etiquetas`,     icon: <Tag className="w-4 h-4" /> },
                 { label: "Ver publicaciones",color: "#FFE600", href: `/appjeez/publicaciones`, icon: <Package className="w-4 h-4" /> },
               ].map(a => (
                 <a
@@ -399,13 +399,11 @@ function AppJeezInner() {
     { label: "Dashboard",       icon: <BarChart2 className="w-4 h-4" />,       href: "/appjeez",               active: true  },
     { label: "Estadísticas",    icon: <TrendingUp className="w-4 h-4" />,      href: "/appjeez/estadisticas",  active: false },
     { label: "Mensajería",      icon: <MessageCircle className="w-4 h-4" />,   href: "/appjeez/mensajes",      active: false },
-    { label: "Envíos",          icon: <Truck className="w-4 h-4" />,           href: "/appjeez/envios",        active: false },
     { label: "Etiquetas",       icon: <Tag className="w-4 h-4" />,             href: "/appjeez/etiquetas",     active: false },
     { label: "Publicaciones",   icon: <Package className="w-4 h-4" />,         href: "/appjeez/publicaciones", active: false },
     { label: "Sincronizar",     icon: <Copy className="w-4 h-4" />,            href: "/appjeez/sincronizar",   active: false },
     { label: "Precios",         icon: <DollarSign className="w-4 h-4" />,     href: "/appjeez/precios",       active: false },
     { label: "Promociones",     icon: <Zap className="w-4 h-4" />,            href: "/appjeez/promociones",   active: false },
-    { label: "Órdenes",         icon: <ShoppingCart className="w-4 h-4" />,   href: "/appjeez/ordenes",       active: false },
     { label: "Cuentas MeLi",    icon: <Store className="w-4 h-4" />,           href: "/configuracion/meli",    active: false },
   ];
 

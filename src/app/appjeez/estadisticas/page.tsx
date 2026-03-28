@@ -3,8 +3,8 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   TrendingUp, RefreshCw, AlertTriangle, ChevronDown, ChevronUp,
-  ShoppingCart, DollarSign, Tag, Package, BarChart2, MessageCircle,
-  Truck, Copy, Store, Zap, ArrowLeft,
+  DollarSign, Tag, Package, BarChart2, MessageCircle,
+  Copy, Store, Zap, ArrowLeft,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -26,6 +26,7 @@ interface PerAccount  { account: string; meli_user_id: string; total_orders: num
 interface StatsData {
   period: string; account_id: string; accounts_count: number;
   sales_by_day: SalesByDay[];
+  sales_by_logistic: Record<string, { qty: number; amount: number }>;
   top_products: TopProduct[];
   shipping_breakdown: ShipBreak;
   reputation: Reputation[];
@@ -114,13 +115,11 @@ export default function EstadisticasPage() {
     { label: "Dashboard",     icon: <BarChart2 className="w-4 h-4" />,   href: "/appjeez"                },
     { label: "Estadísticas",  icon: <TrendingUp className="w-4 h-4" />,  href: "/appjeez/estadisticas"   },
     { label: "Mensajería",    icon: <MessageCircle className="w-4 h-4" />,href: "/appjeez/mensajes"      },
-    { label: "Envíos",        icon: <Truck className="w-4 h-4" />,        href: "/appjeez/envios"        },
     { label: "Etiquetas",     icon: <Tag className="w-4 h-4" />,          href: "/appjeez/etiquetas"     },
     { label: "Publicaciones", icon: <Package className="w-4 h-4" />,      href: "/appjeez/publicaciones" },
     { label: "Sincronizar",   icon: <Copy className="w-4 h-4" />,         href: "/appjeez/sincronizar"   },
     { label: "Precios",       icon: <DollarSign className="w-4 h-4" />,   href: "/appjeez/precios"       },
     { label: "Promociones",   icon: <Zap className="w-4 h-4" />,          href: "/appjeez/promociones"   },
-    { label: "Órdenes",       icon: <ShoppingCart className="w-4 h-4" />, href: "/appjeez/ordenes"       },
     { label: "Cuentas MeLi",  icon: <Store className="w-4 h-4" />,        href: "/configuracion/meli"    },
   ];
 
@@ -244,7 +243,7 @@ export default function EstadisticasPage() {
               {/* KPI Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: "Ventas",       value: String(data.totals.total_orders),  icon: <ShoppingCart className="w-4 h-4" />, color: "#FFE600" },
+                  { label: "Ventas",       value: String(data.totals.total_orders),  icon: <TrendingUp className="w-4 h-4" />, color: "#FFE600" },
                   { label: "Ingresos",     value: fmt(data.totals.total_amount),     icon: <DollarSign className="w-4 h-4" />,   color: "#39FF14" },
                   { label: "Ticket Prom.", value: fmt(data.totals.avg_ticket),        icon: <TrendingUp className="w-4 h-4" />,   color: "#00E5FF" },
                   { label: "Cuentas",      value: String(data.accounts_count),        icon: <Store className="w-4 h-4" />,         color: "#A855F7" },
@@ -309,6 +308,65 @@ export default function EstadisticasPage() {
               {/* Pie + Bar row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+                {/* Bar chart — ventas por tipo de logística */}
+                {data.sales_by_logistic && (
+                  <div className="rounded-2xl p-4"
+                    style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="text-xs font-bold text-white mb-3">VENTAS POR TIPO DE LOGÍSTICA</p>
+                    {(() => {
+                      const logData = (["correo","flex","turbo","full"] as const)
+                        .map(k => ({
+                          name: SHIP_LABELS[k],
+                          qty: data.sales_by_logistic[k]?.qty ?? 0,
+                          amount: data.sales_by_logistic[k]?.amount ?? 0,
+                          color: SHIP_COLORS[k],
+                        }))
+                        .filter(d => d.qty > 0)
+                        .sort((a, b) => b.amount - a.amount);
+                      return logData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart layout="vertical" data={logData}
+                            margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+                            <XAxis type="number" tick={{ fill: "#6B7280", fontSize: 10 }} />
+                            <YAxis type="category" dataKey="name" width={56}
+                              tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                            <Tooltip
+                              contentStyle={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 }}
+                              labelStyle={{ color: "#fff", fontSize: 11 }}
+                              formatter={(value, name) => [
+                                name === "qty" ? `${value} ventas` : fmt(value as number),
+                                name === "qty" ? "Cantidad" : "Ingresos",
+                              ]}
+                            />
+                            <Bar dataKey="qty" radius={[0, 4, 4, 0]}
+                              label={{ position: "right", fill: "#9CA3AF", fontSize: 10 }}>
+                              {logData.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <p className="text-xs text-center py-8" style={{ color: "#6B7280" }}>Sin datos de logística</p>
+                      );
+                    })()}
+                    {/* Revenue by logistic mini summary */}
+                    <div className="grid grid-cols-2 gap-1 mt-2">
+                      {(["correo","flex","turbo","full"] as const)
+                        .filter(k => (data.sales_by_logistic[k]?.qty ?? 0) > 0)
+                        .map(k => (
+                          <div key={k} className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: SHIP_COLORS[k] }} />
+                            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                              {SHIP_LABELS[k]}: <strong className="text-white">{data.sales_by_logistic[k].qty}</strong>
+                              {" · "}<span style={{ color: SHIP_COLORS[k] }}>{fmt(data.sales_by_logistic[k].amount)}</span>
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Pie chart — shipping breakdown */}
                 <div className="rounded-2xl p-4"
                   style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -360,6 +418,7 @@ export default function EstadisticasPage() {
                         data={data.top_products.slice(0, 10).map(p => ({
                           name: p.title.length > 22 ? p.title.slice(0, 22) + "…" : p.title,
                           qty: p.qty,
+                          revenue: p.revenue,
                         }))}
                         margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                         <XAxis type="number" tick={{ fill: "#6B7280", fontSize: 10 }} />
@@ -369,9 +428,9 @@ export default function EstadisticasPage() {
                           contentStyle={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 }}
                           labelStyle={{ color: "#fff", fontSize: 11 }}
                           itemStyle={{ color: "#FFE600", fontSize: 11 }}
-                          formatter={(v) => [`${v} uds.`, "Vendidos"]}
+                          formatter={(v, name) => name === "qty" ? [`${v} uds.`, "Vendidos"] : [fmt(v as number), "Ingresos"]}
                         />
-                        <Bar dataKey="qty" fill="#FFE600" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="qty" fill="#FFE600" radius={[0, 4, 4, 0]} name="qty" />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
