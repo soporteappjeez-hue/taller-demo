@@ -564,7 +564,7 @@ function EtiquetasInner() {
           {qzError && (
             <p className="text-xs rounded-xl p-2" style={{ background: "#ef444418", color: "#ef4444" }}>
               {qzError}
-              <br /><span className="opacity-70">Instalá QZ Tray desde <strong>qz.io</strong> y activá "Allow Unsigned".</span>
+              <br /><span className="opacity-70">Instalá QZ Tray desde <strong>qz.io</strong> y activá &quot;Allow Unsigned&quot;.</span>
             </p>
           )}
 
