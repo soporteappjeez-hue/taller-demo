@@ -341,7 +341,10 @@ function MensajesInner() {
   const [lastSync, setLastSync]   = useState<Date | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [alertsEnabled, setAlertsEnabled] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("maqjeez_alerts_enabled") === "true";
+    return false;
+  });
   const [newCount, setNewCount]   = useState(0);
   const [toast, setToast]         = useState<string | null>(null);
   const alertedIdsRef   = useRef<Set<number>>(new Set());
@@ -361,7 +364,10 @@ function MensajesInner() {
   }, []);
 
   // Mantener ref sincronizada con el estado para evitar closures viejas
-  useEffect(() => { alertsEnabledRef.current = alertsEnabled; }, [alertsEnabled]);
+  useEffect(() => {
+    alertsEnabledRef.current = alertsEnabled;
+    localStorage.setItem("maqjeez_alerts_enabled", String(alertsEnabled));
+  }, [alertsEnabled]);
 
   const playAlert = useCallback(() => {
     // Usar ref para siempre leer el valor actual, no el del closure
