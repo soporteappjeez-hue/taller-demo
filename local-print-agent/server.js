@@ -255,6 +255,8 @@ const server = http.createServer(async (req, res) => {
       }
       const printer = body.printer || DEFAULT_PRINTER;
       log(`Imprimiendo ${body.zpl.length} bytes en "${printer}"...`);
+      // Debug: save last ZPL to file for inspection
+      try { fs.writeFileSync(path.join(__dirname, "_last_zpl.txt"), body.zpl, "utf8"); } catch {}
       await printRaw(body.zpl, printer);
       json(res, 200, { status: "ok", printer, bytes: body.zpl.length });
       return;

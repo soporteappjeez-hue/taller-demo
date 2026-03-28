@@ -3,3 +3,27 @@
 [2026-03-28T20:15:55.214Z] Imprimiendo 2197 bytes en "4BARCODE 4B-2054K"...
 [2026-03-28T20:15:55.303Z] ERROR print: La l�nea de comandos es demasiado larga.
 [2026-03-28T20:15:55.304Z] ERROR: La l�nea de comandos es demasiado larga.
+[2026-03-28T20:24:25.358Z] Imprimiendo 2197 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:24:25.402Z] ERROR print: La l�nea de comandos es demasiado larga.
+[2026-03-28T20:24:25.403Z] ERROR: La l�nea de comandos es demasiado larga.
+[2026-03-28T20:24:59.444Z] Imprimiendo 2197 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:24:59.484Z] ERROR print: La l�nea de comandos es demasiado larga.
+[2026-03-28T20:24:59.485Z] ERROR: La l�nea de comandos es demasiado larga.
+[2026-03-28T20:27:04.947Z] === Print Agent v1.0.0 escuchando en http://127.0.0.1:7070 ===
+[2026-03-28T20:27:06.261Z] Impresora encontrada: "4BARCODE 4B-2054K"
+[2026-03-28T20:30:38.642Z] Imprimiendo 2195 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:30:40.005Z] OK: impreso en "4BARCODE 4B-2054K"
+[2026-03-28T20:33:03.455Z] Imprimiendo 2197 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:33:04.145Z] OK: impreso en "4BARCODE 4B-2054K"
+[2026-03-28T20:34:37.226Z] ERROR: JSON inválido
+[2026-03-28T20:35:03.161Z] === Print Agent v1.0.0 escuchando en http://127.0.0.1:7070 ===
+[2026-03-28T20:35:04.345Z] Impresora encontrada: "4BARCODE 4B-2054K"
+[2026-03-28T20:35:24.296Z] ERROR: JSON inválido
+[2026-03-28T20:36:26.163Z] Imprimiendo 80 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:36:27.443Z] OK: impreso en "4BARCODE 4B-2054K"
+[2026-03-28T20:40:22.000Z] Imprimiendo 2197 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:40:22.825Z] OK: impreso en "4BARCODE 4B-2054K"
+[2026-03-28T20:42:33.391Z] === Print Agent v1.0.0 escuchando en http://127.0.0.1:7070 ===
+[2026-03-28T20:42:34.666Z] Impresora encontrada: "4BARCODE 4B-2054K"
+[2026-03-28T20:46:17.259Z] Imprimiendo 2195 bytes en "4BARCODE 4B-2054K"...
+[2026-03-28T20:46:18.003Z] OK: impreso en "4BARCODE 4B-2054K"

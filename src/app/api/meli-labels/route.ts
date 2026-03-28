@@ -463,13 +463,42 @@ export async function GET(req: Request) {
 
     // ZPL: concatenar texto; PDF: mergear con pdf-lib
     if (format === "zpl") {
-      const merged = new Uint8Array(pdfChunks.reduce((s, c) => s + c.byteLength, 0));
-      let offset = 0;
+      // MeLi returns a ZIP file for zpl2 — extract the text content
+      const zplTexts: string[] = [];
       for (const chunk of pdfChunks) {
-        merged.set(new Uint8Array(chunk), offset);
-        offset += chunk.byteLength;
+        const bytes = new Uint8Array(chunk);
+        // Check if it's a ZIP file (starts with PK\x03\x04)
+        if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) {
+          // Simple ZIP extraction: find the file data between headers
+          // Local file header: PK\x03\x04 (30 bytes + filename + extra)
+          const fnLen = bytes[26] | (bytes[27] << 8);
+          const exLen = bytes[28] | (bytes[29] << 8);
+          const compMethod = bytes[8] | (bytes[9] << 8);
+          const compSize = bytes[18] | (bytes[19] << 8) | (bytes[20] << 16) | (bytes[21] << 24);
+          const dataStart = 30 + fnLen + exLen;
+
+          if (compMethod === 0) {
+            // Stored (no compression)
+            const raw = bytes.slice(dataStart, dataStart + compSize);
+            zplTexts.push(new TextDecoder().decode(raw));
+          } else if (compMethod === 8) {
+            // Deflated — use Node.js zlib
+            const { inflateRawSync } = require("zlib");
+            const compressed = bytes.slice(dataStart, dataStart + compSize);
+            const decompressed = inflateRawSync(Buffer.from(compressed));
+            zplTexts.push(decompressed.toString("utf8"));
+          } else {
+            // Unknown compression — send raw bytes as-is
+            zplTexts.push(new TextDecoder().decode(bytes));
+          }
+        } else {
+          // Not a ZIP — already plain text ZPL
+          zplTexts.push(new TextDecoder().decode(bytes));
+        }
       }
-      return new NextResponse(merged, {
+
+      const mergedText = zplTexts.join("\n");
+      return new NextResponse(mergedText, {
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": `attachment; filename="etiquetas-appjeez.${ext}"`,
