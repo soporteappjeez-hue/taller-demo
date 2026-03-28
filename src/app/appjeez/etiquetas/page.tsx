@@ -446,9 +446,8 @@ function EtiquetasInner() {
             setQzPrinters(printers);
             setQzStatus("connected");
             // Auto-select NoxusPOS if no printer selected yet
-            const activePrinter = printerName ||
-              printers.find(p => /noxus|zebra|zd|zp|gc|lp|tlp|zt|xprinter|tsc|godex|brother|dymo/i.test(p)) ??
-              printers[0] ?? "";
+            const foundPrinter = printers.find(p => /noxus|zebra|zd|zp|gc|lp|tlp|zt|xprinter|tsc|godex|brother|dymo/i.test(p)) ?? printers[0] ?? "";
+            const activePrinter = printerName || foundPrinter;
             if (activePrinter && !printerName) {
               setPrinterName(activePrinter);
               localStorage.setItem("qz_printer_name", activePrinter);
