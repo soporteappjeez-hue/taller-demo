@@ -68,6 +68,21 @@ export default function QuestionAlertGlobal() {
     }
   }, []);
 
+  // Función para reproducir sonido de alerta según el modo
+  const playAlertSound = useCallback((mode: AlertMode) => {
+    const config = ALERT_MODES[mode];
+    const audio = new Audio(config.soundFile);
+    audio.volume = config.volume;
+    audio.play().catch((e) => console.log("Error al reproducir audio:", e));
+  }, []);
+
+  // Función para mostrar notificación de cambio de modo
+  const showModeNotification = useCallback((mode: AlertMode) => {
+    const config = ALERT_MODES[mode];
+    setToast(`${config.icon} Modo ${config.label} activado - Prueba de sonido realizada`);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
   const pollQuestions = useCallback(async () => {
     try {
       const res = await fetch("/api/meli-questions");
@@ -188,21 +203,41 @@ export default function QuestionAlertGlobal() {
               {showModeDropdown && (
                 <div className="absolute bottom-full right-0 mb-2 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] min-w-max">
                   {(Object.keys(ALERT_MODES) as AlertMode[]).map((mode) => (
-                    <button
+                    <div
                       key={mode}
-                      onClick={() => {
-                        setAlertMode(mode);
-                        setShowModeDropdown(false);
-                      }}
-                      className={`block w-full text-left px-4 py-2.5 text-sm transition-colors first:rounded-t-lg last:rounded-b-lg ${
-                        alertMode === mode
-                          ? "bg-blue-600 text-white font-bold"
-                          : "text-gray-300 hover:bg-gray-800"
+                      className={`flex items-center justify-between px-3 py-2 transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                        alertMode === mode ? "bg-blue-600" : "hover:bg-gray-800"
                       }`}
                     >
-                      <span className="text-lg mr-2">{ALERT_MODES[mode].icon}</span>
-                      {ALERT_MODES[mode].label}
-                    </button>
+                      <button
+                        onClick={() => {
+                          setAlertMode(mode);
+                          playAlertSound(mode);
+                          showModeNotification(mode);
+                          setShowModeDropdown(false);
+                        }}
+                        className={`flex-1 text-left flex items-center gap-2 text-sm transition-colors ${
+                          alertMode === mode ? "text-white font-bold" : "text-gray-300"
+                        }`}
+                      >
+                        <span className="text-lg">{ALERT_MODES[mode].icon}</span>
+                        {ALERT_MODES[mode].label}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playAlertSound(mode);
+                        }}
+                        className={`ml-2 px-2 py-1 rounded text-sm transition-all ${
+                          alertMode === mode
+                            ? "bg-white text-blue-600 hover:bg-gray-100"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                        title="Reproducir prueba de sonido"
+                      >
+                        ▶️
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

@@ -11,6 +11,8 @@ export interface AlertModeConfig {
   style: string;
   icon: string;
   animation: string;
+  soundFile: string;
+  volume: number;
 }
 
 export const ALERT_MODES: Record<AlertMode, AlertModeConfig> = {
@@ -20,6 +22,8 @@ export const ALERT_MODES: Record<AlertMode, AlertModeConfig> = {
     style: "bg-blue-600",
     icon: "🔹",
     animation: "",
+    soundFile: "/sounds/alerta-discreto.mp3",
+    volume: 0.5,
   },
   taller: {
     label: "Taller (Estándar)",
@@ -27,6 +31,8 @@ export const ALERT_MODES: Record<AlertMode, AlertModeConfig> = {
     style: "bg-green-600",
     icon: "🔔",
     animation: "",
+    soundFile: "/sounds/alerta-taller.mp3",
+    volume: 0.5,
   },
   urgente: {
     label: "Ruidoso (Urgente)",
@@ -34,6 +40,8 @@ export const ALERT_MODES: Record<AlertMode, AlertModeConfig> = {
     style: "bg-red-600",
     icon: "⚠️",
     animation: "animate-pulse", // Hace que la alerta parpadee
+    soundFile: "/sounds/alerta-urgente.mp3",
+    volume: 1.0,
   },
 };
 
