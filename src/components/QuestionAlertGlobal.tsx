@@ -17,7 +17,6 @@ export default function QuestionAlertGlobal() {
   const [showModeDropdown, setShowModeDropdown] = useState(false);
 
   const enabledRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const alertedIdsRef = useRef<Set<number>>(new Set());
   const initialLoadDone = useRef(false);
@@ -32,11 +31,6 @@ export default function QuestionAlertGlobal() {
     if (storedMode && Object.keys(ALERT_MODES).includes(storedMode)) {
       setAlertMode(storedMode);
     }
-
-    audioRef.current = new Audio(
-      "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdHuMk42Bfn6Dj5yWjIB7fIOQm5eSh3t2fImWmpOJf3t8iJabl46DfXuFk5qXj4R9fIOSmZWNhH19hZOZl4+EfX2Ek5mXj4R9fYWTmZePhH19hJOZl4+EfX2Fk5mXj4R9fYSTmZePhH19hZOZl4+EfX2Ek5mVjYR+fYWTmJWOhH59hZOYlY6Efn2Fk5iVjoR+fYWTl5SNhH59hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5eUjYR+foWTl5SNhH5+hZOXlI2Efn6Fk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6Gk5aUjYR+foaTlpSNhH5+hpOWlI2Efn6GkpaUjYR+foaSg3xtZnF+i5OPh4F9gIuWlY6DfHyEkpmXjoN8fISSmZeOg3x8hJKZl46DfHyEkpmXjoN8fISSmZeOg3x8hJKZlo2Dfn6Gk5aUjYR+fg=="
-    );
-    audioRef.current.volume = 0.7;
 
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
@@ -54,20 +48,6 @@ export default function QuestionAlertGlobal() {
     localStorage.setItem(ALERT_MODE_STORAGE_KEY, alertMode);
   }, [alertMode]);
 
-  const playAlert = useCallback(() => {
-    if (!enabledRef.current) return;
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    }
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification("MaqJeez — Nueva pregunta", {
-        body: "Hay preguntas nuevas sin responder en MercadoLibre",
-        icon: "/icon-192.png",
-      });
-    }
-  }, []);
-
   // Función para reproducir sonido de alerta según el modo
   const playAlertSound = useCallback((mode: AlertMode) => {
     try {
@@ -78,10 +58,9 @@ export default function QuestionAlertGlobal() {
         currentAudio.currentTime = 0;
       }
 
-      const config = ALERT_MODES[mode];
       const audioPath = `/sounds/alerta-${mode}.mp3`;
       const audio = new Audio(audioPath);
-      audio.volume = config.volume;
+      audio.volume = 1.0; // Volumen máximo para todos los modos
       
       // Guardar referencia global
       (window as any).currentAlertAudio = audio;
@@ -139,13 +118,13 @@ export default function QuestionAlertGlobal() {
 
       if (newQuestions > 0) {
         setNewCount(prev => prev + newQuestions);
-        playAlert();
+        playAlertSound(alertMode);
         const modeConfig = ALERT_MODES[alertMode];
         setToast(`${newQuestions} pregunta${newQuestions > 1 ? "s" : ""} nueva${newQuestions > 1 ? "s" : ""} de ${newAccounts.join(", ")}`);
         setTimeout(() => setToast(null), modeConfig.duration);
       }
     } catch { /* silent */ }
-  }, [playAlert, alertMode]);
+  }, [playAlertSound, alertMode]);
 
   useEffect(() => { loadRef.current = pollQuestions; }, [pollQuestions]);
 
@@ -170,12 +149,6 @@ export default function QuestionAlertGlobal() {
   }, []);
 
   const handleEnable = () => {
-    if (audioRef.current) {
-      audioRef.current.play().then(() => {
-        audioRef.current!.pause();
-        audioRef.current!.currentTime = 0;
-      }).catch(() => {});
-    }
     if (typeof Notification !== "undefined" && Notification.permission !== "denied") {
       Notification.requestPermission().catch(() => {});
     }
@@ -183,13 +156,6 @@ export default function QuestionAlertGlobal() {
   };
 
   const handleDisable = () => setEnabled(false);
-
-  const testSound = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    }
-  };
 
   return (
     <>
@@ -267,12 +233,6 @@ export default function QuestionAlertGlobal() {
               )}
             </div>
 
-            <button onClick={testSound}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all"
-              style={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.1)" }}
-              title="Probar sonido">
-              <Volume2 className="w-4 h-4 text-gray-400" />
-            </button>
             <button onClick={handleDisable}
               className="w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg"
               style={{ background: "#39FF14", border: "2px solid #39FF1460" }}
