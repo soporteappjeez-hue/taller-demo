@@ -6,7 +6,7 @@ import { Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Props {
   preguntaTexto: string;
-  onUseSuggestion: (texto: string, id: string) => void;
+  onUseSuggestion: (texto: string) => void;
 }
 
 export default function QuestionSuggestion({ preguntaTexto, onUseSuggestion }: Props) {
@@ -37,7 +37,7 @@ export default function QuestionSuggestion({ preguntaTexto, onUseSuggestion }: P
     if (!sugerencia) return;
 
     // Llenar textarea con la respuesta sugerida
-    onUseSuggestion(sugerencia.respuesta_exitosa, sugerencia.id);
+    onUseSuggestion(sugerencia.respuesta_exitosa);
 
     // Incrementar contador de uso
     await incrementUsageCount(sugerencia.id);
