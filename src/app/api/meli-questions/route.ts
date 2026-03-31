@@ -74,7 +74,7 @@ export async function GET(req: Request) {
             meli_account_id:  acc.id,
             item_id:          q.item_id,
             item_title:       itemCache[q.item_id].title,
-            item_thumbnail:   itemCache[q.item_id].thumbnail,
+            item_thumbnail:   (itemCache[q.item_id].thumbnail || "").replace("http://", "https://"),
             buyer_id:         q.from?.id ?? null,
             buyer_nickname:   q.from?.nickname ?? null,
             question_text:    q.text,
