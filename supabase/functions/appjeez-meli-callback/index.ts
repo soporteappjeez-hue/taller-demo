@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
 
   const APP_ID       = Deno.env.get("APPJEEZ_MELI_APP_ID");
   const SECRET_KEY   = Deno.env.get("APPJEEZ_MELI_SECRET_KEY");
-  const FRONTEND_URL = Deno.env.get("APPJEEZ_FRONTEND_URL") ?? "https://taller-motos-app-two.vercel.app";
+  const FRONTEND_URL = Deno.env.get("APPJEEZ_FRONTEND_URL") ?? "https://taller-motos-app-production.up.railway.app";
   const ENC_KEY      = Deno.env.get("APPJEEZ_MELI_ENCRYPTION_KEY");
   const SUPA_URL     = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

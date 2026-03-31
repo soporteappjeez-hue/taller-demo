@@ -1,7 +1,7 @@
 // Test: download a ZPL label from Vercel and check if it's decompressed
 const https = require("https");
 
-const url = "https://taller-motos-app-two.vercel.app/api/meli-labels?action=download&format=zpl&ids=2000015732011282";
+const url = "https://taller-motos-app-production.up.railway.app/api/meli-labels?action=download&format=zpl&ids=2000015732011282";
 
 https.get(url, (res) => {
   const chunks = [];
