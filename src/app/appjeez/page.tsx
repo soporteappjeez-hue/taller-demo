@@ -436,7 +436,7 @@ function AppJeezInner() {
   };
 
   const totalUrgent = accounts.reduce(
-    (s, a) => s + (a.unanswered_questions ?? 0) + (a.ready_to_ship ?? 0) + (a.pending_messages ?? 0), 0
+    (s, a) => s + (a.unanswered_questions ?? 0) + (a.ready_to_ship ?? 0) + (a.pending_messages ?? 0) + (a.claims_count ?? 0), 0
   );
   const totalSales = accounts.reduce((s, a) => s + (a.today_orders ?? 0), 0);
   const totalAmount = accounts.reduce((s, a) => s + (a.today_sales_amount ?? 0), 0);
@@ -612,7 +612,7 @@ function AppJeezInner() {
 
           {/* Global summary */}
           {!loading && accounts.length > 0 && (
-            <KpiBar accountsCount={accounts.length} salesToday={totalSales} totalAmount={totalAmount} />
+            <KpiBar accountsCount={accounts.length} salesToday={totalSales} totalAmount={totalAmount} urgentAlerts={totalUrgent} />
           )}
 
           {/* Error */}
