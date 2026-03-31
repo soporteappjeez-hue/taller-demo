@@ -379,24 +379,27 @@ function AppJeezInner() {
     60000
   );
 
+  // Callback para procesar notificaciones (estable entre renders)
+  const handleNotification = useCallback((notification: any) => {
+    console.log("[SSE] Notificación recibida:", notification);
+    // Actualizar solo la cuenta del notification.user_id
+    setAccounts(prev =>
+      prev.map(acc =>
+        acc.meli_user_id === notification.user_id
+          ? {
+              ...acc,
+              unanswered_questions: (acc.unanswered_questions ?? 0) + 1,
+            }
+          : acc
+      )
+    );
+    // Incrementar badge global
+    setTotalQuestionsAlert(prev => prev + 1);
+  }, []);
+
   // Conectar a SSE para notificaciones en tiempo real
   const { connected: streamConnected } = useNotificationStream(
-    (notification) => {
-      console.log("[SSE] Notificación recibida:", notification);
-      // Actualizar solo la cuenta del notification.user_id
-      setAccounts(prev =>
-        prev.map(acc =>
-          acc.meli_user_id === notification.user_id
-            ? {
-                ...acc,
-                unanswered_questions: (acc.unanswered_questions ?? 0) + 1,
-              }
-            : acc
-        )
-      );
-      // Incrementar badge global
-      setTotalQuestionsAlert(prev => prev + 1);
-    },
+    handleNotification,
     true // Enabled por defecto
   );
 
