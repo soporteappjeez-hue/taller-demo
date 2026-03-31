@@ -25,6 +25,7 @@ interface ShipmentInfo {
   quantity: number;
   unit_price: number | null;
   seller_sku: string | null;
+  attributes?: string | null;  // Ej: "Color: Negro"
   status: string;
   status_label: string | null;
   substatus: string | null;
@@ -131,6 +132,12 @@ function parseOrder(
   const rawStatus = (ship.status as string | undefined) ?? "ready_to_ship";
   const type = isFullByTracking ? "full" : classifyType(logistic, allTags, undefined, mode);
 
+  // Extraer atributos del producto (Ej: "Color: Negro, Talle: M")
+  const attributes = ((firstItem?.item as any)?.attributes as Array<{ name: string; values?: Array<{ name: string }> }> | undefined)
+    ?.map(attr => `${attr.name}: ${attr.values?.[0]?.name || ''}`)
+    .filter(s => s.trim() && !s.includes(': '))
+    .join(', ') || null;
+
   return {
     shipment_id:    sid,
     order_id:       (order.id as number | undefined) ?? null,
@@ -144,6 +151,7 @@ function parseOrder(
     quantity:       firstItem?.quantity ?? 1,
     unit_price:     firstItem?.unit_price ?? null,
     seller_sku:     firstItem?.item?.seller_sku ?? null,
+    attributes:     attributes,
     status:         rawStatus,
     status_label:   statusLabel(rawStatus, type),
     substatus:      (ship.substatus as string | undefined) ?? null,

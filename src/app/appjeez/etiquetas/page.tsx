@@ -20,12 +20,15 @@ interface ShipmentInfo {
   buyer: string;
   buyer_nickname: string | null;
   title: string;
+  quantity: number;
   thumbnail: string | null;
   delivery_date: string | null;
   dispatch_date: string | null;
   printed_at?: string | null;
   item_id: string | null;
   purchase_url?: string | null;
+  seller_sku?: string | null;
+  attributes?: string | null;
   urgency: "delayed" | "today" | "tomorrow" | "week" | "upcoming";
   status: string;
   status_label: string | null;
@@ -126,10 +129,33 @@ function LabelCard({
             </span>
             <ZoneIndicator zone={zone} />
           </div>
-          <p className="text-xs font-bold text-white line-clamp-2 mb-1">{shipment.title}</p>
+          <p className="text-xs font-bold text-white line-clamp-2 mb-1">
+            {shipment.title}
+            {shipment.attributes && (
+              <span className="text-gray-400 text-[11px] font-normal"> • {shipment.attributes}</span>
+            )}
+          </p>
           <p className="text-[10px]" style={{ color: "#6B7280" }}>
             {shipment.buyer}{shipment.buyer_nickname ? ` (@${shipment.buyer_nickname})` : ""}
           </p>
+          
+          {/* Detalles: Unidades + SKU */}
+          <div className="flex items-center gap-2 text-[10px] mt-2 p-1.5 rounded"
+            style={{ background: "rgba(255,255,255,0.05)" }}>
+            <div>
+              <span style={{ color: "#9CA3AF" }}>Unidades:</span>
+              <span className="ml-1 font-bold text-white">{shipment.quantity}</span>
+            </div>
+            {shipment.seller_sku && (
+              <>
+                <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.2)" }}></div>
+                <div className="truncate">
+                  <span style={{ color: "#9CA3AF" }}>SKU:</span>
+                  <span className="ml-1 font-bold text-white truncate">{shipment.seller_sku}</span>
+                </div>
+              </>
+            )}
+          </div>
           {shipment.dispatch_date && (
             <p className="text-[10px] mt-1" style={{ color: "#FF9800" }}>
               📦 Despachar antes del {new Date(shipment.dispatch_date).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}
