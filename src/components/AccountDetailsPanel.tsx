@@ -189,7 +189,68 @@ export default function AccountDetailsPanel({ data }: Props) {
               />
             </div>
 
-            {/* Sección 5: Acciones Rápidas - Botones */}
+            {/* Sección 5: POST-VENTA UNIFICADA - Reclamos, Mediaciones, Demoras */}
+            {meliData?.reputation && (
+              <div
+                className="rounded-lg p-3 space-y-2"
+                style={{ background: "#EF444410", border: "1px solid #EF444422" }}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#EF4444" }}>
+                  📊 Post-Venta (Últimos 60 días)
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Reclamos */}
+                  <div
+                    className="rounded p-2 text-center"
+                    style={{ background: "#EF444415", border: "1px solid #EF444422" }}
+                  >
+                    <p className="text-[10px]" style={{ color: "#6B7280" }}>
+                      Reclamos
+                    </p>
+                    <p className="text-sm font-black" style={{ color: "#EF4444" }}>
+                      {meliData.reputation.claims ? (meliData.reputation.claims * 100).toFixed(2) : "0"}%
+                    </p>
+                    <p className="text-[8px]" style={{ color: "#6B7280" }}>
+                      {data.claims_count ?? 0} abiertos
+                    </p>
+                  </div>
+
+                  {/* Mediaciones */}
+                  <div
+                    className="rounded p-2 text-center"
+                    style={{ background: "#FF572215", border: "1px solid #FF572222" }}
+                  >
+                    <p className="text-[10px]" style={{ color: "#6B7280" }}>
+                      Mediaciones
+                    </p>
+                    <p className="text-sm font-black" style={{ color: "#FF5722" }}>
+                      {meliData.reputation.cancellations ? (meliData.reputation.cancellations * 100).toFixed(2) : "0"}%
+                    </p>
+                    <p className="text-[8px]" style={{ color: "#6B7280" }}>
+                      En análisis
+                    </p>
+                  </div>
+
+                  {/* Demoras en Despacho */}
+                  <div
+                    className="rounded p-2 text-center"
+                    style={{ background: "#FFE60015", border: "1px solid #FFE60022" }}
+                  >
+                    <p className="text-[10px]" style={{ color: "#6B7280" }}>
+                      Demoras
+                    </p>
+                    <p className="text-sm font-black" style={{ color: "#FFE600" }}>
+                      {meliData.reputation.delayed_handling_time ? (meliData.reputation.delayed_handling_time * 100).toFixed(2) : "0"}%
+                    </p>
+                    <p className="text-[8px]" style={{ color: "#6B7280" }}>
+                      En envío
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sección 6: Acciones Rápidas - Botones */}
             <div className="grid grid-cols-2 gap-2 pt-2">
               {/* Ver Preguntas - Link a Mensajería interna */}
               <Link
@@ -200,13 +261,13 @@ export default function AccountDetailsPanel({ data }: Props) {
                 Ver Preguntas
               </Link>
 
-              {/* Post Venta - Link interno al dashboard con query param */}
+              {/* Post Venta / Gestionar Reclamos - Link a página unificada */}
               <Link
                 href={`/appjeez/post-venta?account=${data.account}`}
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 text-center"
                 style={{ background: "#EF4444", border: "none", textDecoration: "none" }}
               >
-                Post Venta
+                Gestionar Reclamos
               </Link>
 
               {/* Imprimir Envíos - Link a Etiquetas interna */}
