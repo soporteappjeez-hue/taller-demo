@@ -3,6 +3,8 @@
 import { MessageCircle, MessageSquare, Truck, Package, Pencil, Check, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useMeliAccountData } from "@/hooks/useMeliAccountData";
 import ReputationBadge from "@/components/ReputationBadge";
+import MetricsBar from "@/components/MetricsBar";
+import UrgentMetrics from "@/components/UrgentMetrics";
 
 interface Reputation {
   level_id: string | null;
@@ -12,6 +14,10 @@ interface Reputation {
   ratings_positive: number;
   ratings_negative: number;
   ratings_neutral: number;
+  delayed_handling_time: number;
+  claims: number;
+  cancellations: number;
+  immediate_payment: boolean;
 }
 
 interface AccountDash {
@@ -23,6 +29,9 @@ interface AccountDash {
   total_items: number;
   today_orders: number;
   today_sales_amount: number;
+  claims_count: number;
+  measurement_date: string;
+  metrics_period: string;
   reputation: Reputation;
   roman_index: string;
   display_name: string;
@@ -213,7 +222,7 @@ export default function CompactAccountRow({
 
           {meliData && (
             <>
-              {/* Reputación badges */}
+              {/* Sección 1: Reputación - Nivel + Badge de Poder Vendedor */}
               {meliData.reputation && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6B7280" }}>
@@ -227,26 +236,69 @@ export default function CompactAccountRow({
                 </div>
               )}
 
-              {/* Métricos rápidas - Preguntas, Mensajes, Envíos */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+              {/* Sección 2: Métricas de Reputación (Reclamos, Canceladas, Demora Envíos) */}
+              {meliData.reputation && (
+                <MetricsBar
+                  claims={meliData.reputation.claims ?? 0}
+                  cancellations={meliData.reputation.cancellations ?? 0}
+                  delayedHandlingTime={meliData.reputation.delayed_handling_time ?? 0}
+                  measurementPeriod={data.metrics_period || "Últimos 60 días"}
+                />
+              )}
+
+              {/* Sección 3: Pendientes Urgentes - 4 Cards Clicables */}
+              <UrgentMetrics
+                questions={data.unanswered_questions ?? 0}
+                messages={data.pending_messages ?? 0}
+                shipments={data.ready_to_ship ?? 0}
+                claims={data.claims_count ?? 0}
+              />
+
+              {/* Sección 4: Resumen de Stock - 3 Cards */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
                 <MetricCard
-                  icon={<MessageCircle className="w-3.5 h-3.5" />}
-                  label="Preguntas"
-                  value={data.unanswered_questions ?? 0}
-                  color="#FF5722"
+                  label="Activas"
+                  value={meliData.stats?.total_active_items ?? 0}
+                  color="#39FF14"
                 />
                 <MetricCard
-                  icon={<MessageSquare className="w-3.5 h-3.5" />}
-                  label="Mensajes"
-                  value={data.pending_messages ?? 0}
-                  color="#FF9800"
+                  label="Bajo Stock"
+                  value={meliData.stats?.items_low_stock ?? 0}
+                  color="#FFE600"
                 />
                 <MetricCard
-                  icon={<Truck className="w-3.5 h-3.5" />}
-                  label="Envíos"
-                  value={data.ready_to_ship ?? 0}
-                  color="#00E5FF"
+                  label="Sin Stock"
+                  value={meliData.stats?.items_out_of_stock ?? 0}
+                  color="#EF4444"
                 />
+              </div>
+
+              {/* Sección 5: Acciones Rápidas - Botones */}
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
+                  style={{ background: "#FF5722", border: "none" }}
+                >
+                  Ver Preguntas
+                </button>
+                <button
+                  className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
+                  style={{ background: "#EF4444", border: "none" }}
+                >
+                  Ver Reclamos
+                </button>
+                <button
+                  className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
+                  style={{ background: "#00E5FF", border: "none", color: "#000" }}
+                >
+                  Imprimir Envíos
+                </button>
+                <button
+                  className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
+                  style={{ background: "#9C27B0", border: "none" }}
+                >
+                  Sincronizar
+                </button>
               </div>
             </>
           )}
@@ -262,7 +314,7 @@ function MetricCard({
   value,
   color,
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   value: number;
   color: string;
@@ -275,10 +327,13 @@ function MetricCard({
         border: `1px solid ${value > 0 ? color + "33" : "rgba(255,255,255,0.07)"}`,
       }}
     >
-      <div className="flex items-center gap-1" style={{ color }}>
-        {icon}
-        <span className="text-[9px] font-semibold text-gray-400">{label}</span>
-      </div>
+      {icon && (
+        <div className="flex items-center gap-1" style={{ color }}>
+          {icon}
+          <span className="text-[9px] font-semibold text-gray-400">{label}</span>
+        </div>
+      )}
+      {!icon && <span className="text-[9px] font-semibold text-gray-400">{label}</span>}
       <p className="text-xs font-black" style={{ color: value > 0 ? color : "#6B7280" }}>
         {value}
       </p>

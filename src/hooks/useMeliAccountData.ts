@@ -11,6 +11,10 @@ interface Reputation {
   ratings_positive: number;
   ratings_negative: number;
   ratings_neutral: number;
+  delayed_handling_time: number;
+  claims: number;
+  cancellations: number;
+  immediate_payment: boolean;
 }
 
 interface Item {
