@@ -11,6 +11,7 @@ import {
   Bell, Store, Menu, X, Copy, Pencil, Check, Zap,
 } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useNotificationStream } from "@/hooks/useNotificationStream";
 import CompactAccountRow from "@/components/CompactAccountRow";
 import KpiBar from "@/components/KpiBar";
 
@@ -371,8 +372,33 @@ function AppJeezInner() {
     load();
   }, [load]);
 
-  // Auto-refresh cada 60 segundos
-  const { isRefreshing } = useAutoRefresh(load, true, 60000);
+  // ⚠️ Polling automático DESACTIVADO - Usando SSE/Webhooks en su lugar
+  const { isRefreshing, manualRefresh } = useAutoRefresh(
+    load,
+    false, // NO automático (era true cada 60s antes)
+    60000
+  );
+
+  // Conectar a SSE para notificaciones en tiempo real
+  const { connected: streamConnected } = useNotificationStream(
+    (notification) => {
+      console.log("[SSE] Notificación recibida:", notification);
+      // Actualizar solo la cuenta del notification.user_id
+      setAccounts(prev =>
+        prev.map(acc =>
+          acc.meli_user_id === notification.user_id
+            ? {
+                ...acc,
+                unanswered_questions: (acc.unanswered_questions ?? 0) + 1,
+              }
+            : acc
+        )
+      );
+      // Incrementar badge global
+      setTotalQuestionsAlert(prev => prev + 1);
+    },
+    true // Enabled por defecto
+  );
 
   const handleRenameAccount = async (meliUserId: string, newName: string) => {
     if (!newName.trim()) return;
@@ -519,7 +545,12 @@ function AppJeezInner() {
             <div>
               <h1 className="font-black text-white text-base sm:text-lg">Dashboard</h1>
               <p className="text-[10px]" style={{ color: "#6B7280" }}>
-                {lastUpdate ? `Actualizado ${lastUpdate.toLocaleTimeString("es-AR")}` : "Cargando..."}
+                {streamConnected ? (
+                  <span style={{ color: "#39FF14" }}>🟢 En vivo</span>
+                ) : (
+                  <span style={{ color: "#ef4444" }}>🔴 Desconectado</span>
+                )}
+                {" "} • {lastUpdate ? `Cargado ${lastUpdate.toLocaleTimeString("es-AR")}` : "Cargando..."}
               </p>
             </div>
           </div>

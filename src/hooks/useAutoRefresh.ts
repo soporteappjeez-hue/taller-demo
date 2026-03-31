@@ -9,16 +9,16 @@ interface UseAutoRefreshReturn {
 }
 
 /**
- * Hook para auto-refresh cada N segundos con sincronización de estado
- * - Ejecuta fetchFn cada `interval` ms
- * - Actualiza estado sin recargar página
- * - Logging en consola
- * - Cleanup automático al desmontar
+ * Hook para refresh MANUAL de datos (sin polling automático)
+ * Con SSE/Webhooks activos, ya no necesitamos polling automático
+ * Este hook solo proporciona función de refresh manual bajo demanda
+ * 
+ * enableAutomatic: DESACTIVADO por defecto (era 60s antes)
  */
 export function useAutoRefresh(
   fetchFn: () => Promise<void>,
-  enabled: boolean = true,
-  interval: number = 60000 // 60 segundos por defecto
+  enableAutomatic: boolean = false, // ⚠️ Ahora DESACTIVADO por defecto
+  interval: number = 60000 // 60 segundos (no se usa si enableAutomatic=false)
 ): UseAutoRefreshReturn {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -31,24 +31,29 @@ export function useAutoRefresh(
     try {
       await fetchFn();
       setLastRefresh(new Date());
-      console.log(`[AUTO-REFRESH] Sincronización completada a las ${new Date().toLocaleTimeString("es-AR")}`);
+      console.log(`[REFRESH] Sincronización manual completada a las ${new Date().toLocaleTimeString("es-AR")}`);
     } catch (error) {
-      console.error("[AUTO-REFRESH] Error:", error);
+      console.error("[REFRESH] Error:", error);
     } finally {
       setIsRefreshing(false);
     }
   }, [fetchFn, isRefreshing]);
 
   useEffect(() => {
-    if (!enabled) return;
+    // Si automatic está desactivado, no iniciar polling
+    if (!enableAutomatic) {
+      console.log("[REFRESH] Polling automático DESACTIVADO (usando SSE/Webhooks)");
+      return;
+    }
 
-    // Ejecutar refresh inicial
+    // Si está habilitado (caso legacy), hacer polling
     manualRefresh();
 
-    // Configurar intervalo
     intervalRef.current = setInterval(() => {
       manualRefresh();
     }, interval);
+
+    console.warn("[REFRESH] ⚠️ Polling automático ACTIVADO (modo legacy)");
 
     // Cleanup
     return () => {
@@ -56,7 +61,7 @@ export function useAutoRefresh(
         clearInterval(intervalRef.current);
       }
     };
-  }, [enabled, interval, manualRefresh]);
+  }, [enableAutomatic, interval, manualRefresh]);
 
   return {
     isRefreshing,
@@ -64,3 +69,4 @@ export function useAutoRefresh(
     manualRefresh,
   };
 }
+
