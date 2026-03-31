@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { MessageCircle, MessageSquare, Truck, Package } from "lucide-react";
 import { useMeliAccountData } from "@/hooks/useMeliAccountData";
 import ReputationBadge from "@/components/ReputationBadge";
@@ -106,10 +107,9 @@ export default function AccountDetailsPanel({ data }: Props) {
               )}
               <p className="font-bold text-white text-xs">@{data.account}</p>
             </div>
-            <div className="flex items-center gap-2 text-[10px] mt-1">
-              <RepoBadge level={data.reputation?.level_id ?? null} />
-              <span style={{ color: "#6B7280" }}>{data.total_items ?? 0} pub.</span>
-            </div>
+            <p className="text-[10px] mt-1" style={{ color: "#6B7280" }}>
+              {data.total_items ?? 0} publicaciones
+            </p>
           </div>
         </div>
       </div>
@@ -191,30 +191,45 @@ export default function AccountDetailsPanel({ data }: Props) {
 
             {/* Sección 5: Acciones Rápidas - Botones */}
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <button
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
-                style={{ background: "#FF5722", border: "none" }}
+              {/* Ver Preguntas - Link a MeLi */}
+              <a
+                href="https://www.mercadolibre.com.ar/preguntas/vendedor"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 text-center"
+                style={{ background: "#FF5722", border: "none", textDecoration: "none" }}
               >
                 Ver Preguntas
-              </button>
-              <button
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
-                style={{ background: "#EF4444", border: "none" }}
+              </a>
+
+              {/* Post Venta - Link interno al dashboard */}
+              <Link
+                href="/appjeez/post-venta"
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 text-center"
+                style={{ background: "#EF4444", border: "none", textDecoration: "none" }}
               >
-                Ver Reclamos
-              </button>
-              <button
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
-                style={{ background: "#00E5FF", border: "none", color: "#000" }}
+                Post Venta
+              </Link>
+
+              {/* Imprimir Envíos - Link a MeLi */}
+              <a
+                href="https://www.mercadolibre.com.ar/vender/ventas/listado"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 text-center"
+                style={{ background: "#00E5FF", border: "none", color: "#000", textDecoration: "none" }}
               >
                 Imprimir Envíos
-              </button>
-              <button
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95"
-                style={{ background: "#9C27B0", border: "none" }}
+              </a>
+
+              {/* Sincronizar - Link al menu de sincronización */}
+              <Link
+                href="/appjeez/sincronizar"
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 text-center"
+                style={{ background: "#9C27B0", border: "none", textDecoration: "none" }}
               >
                 Sincronizar
-              </button>
+              </Link>
             </div>
           </>
         )}

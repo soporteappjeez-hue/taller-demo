@@ -480,6 +480,7 @@ function AppJeezInner() {
     { label: "Sincronizar",     icon: <Copy className="w-4 h-4" />,            href: "/appjeez/sincronizar",   active: false },
     { label: "Precios",         icon: <DollarSign className="w-4 h-4" />,     href: "/appjeez/precios",       active: false },
     { label: "Promociones",     icon: <Zap className="w-4 h-4" />,            href: "/appjeez/promociones",   active: false },
+    { label: "Post-Venta",      icon: <AlertTriangle className="w-4 h-4" />,  href: "/appjeez/post-venta",    active: false },
     { label: "Cuentas MeLi",    icon: <Store className="w-4 h-4" />,           href: "/configuracion/meli",    active: false },
   ];
 
