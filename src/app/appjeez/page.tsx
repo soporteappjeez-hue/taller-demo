@@ -38,6 +38,9 @@ interface AccountDash {
   total_items: number;
   today_orders: number;
   today_sales_amount: number;
+  claims_count: number;
+  measurement_date: string;
+  metrics_period: string;
   reputation: Reputation;
   roman_index: string;
   display_name: string;

@@ -11,17 +11,20 @@ async function processAccount(acc: MeliAccount) {
       return {
         account: acc.nickname, meli_user_id: String(acc.meli_user_id),
         error: "token_expired", unanswered_questions: 0, pending_messages: 0,
-        ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, reputation: null,
+        ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
+        claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
+        reputation: null,
       };
     }
     const uid = String(acc.meli_user_id);
 
-    const [userData, ordersRes, shipments, itemsSearch, questions] = await Promise.all([
+    const [userData, ordersRes, shipments, itemsSearch, questions, disputes] = await Promise.all([
       meliGet(`/users/${uid}`, token),
       meliGet(`/orders/search?seller=${uid}&order.status=paid&sort=date_desc&limit=50`, token),
       meliGet(`/shipments/search?seller_id=${uid}&status=ready_to_ship&limit=1`, token),
       meliGet(`/users/${uid}/items/search?limit=1`, token),
       meliGet(`/questions/search?seller_id=${uid}&status=UNANSWERED&limit=1`, token),
+      meliGet(`/orders/search?seller=${uid}&order.status=disputed&limit=1`, token),
     ]);
 
     const nowArg = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
@@ -40,6 +43,9 @@ async function processAccount(acc: MeliAccount) {
       total_items:          itemsSearch?.paging?.total ?? 0,
       today_orders:         todayOrders.length,
       today_sales_amount:   totalAmount,
+      claims_count:         disputes?.paging?.total ?? 0,
+      measurement_date:     new Date().toISOString(),
+      metrics_period:       "Últimos 60 días",
       reputation: rep ? {
         level_id:               rep.level_id ?? null,
         power_seller_status:    rep.power_seller_status ?? null,
@@ -58,19 +64,22 @@ async function processAccount(acc: MeliAccount) {
     const errMsg = (err as Error).message;
     console.error(`[processAccount] Error para ${acc.nickname}:`, errMsg);
     
-    // Detectar error 451 específicamente
     if (errMsg.includes("HTTP_451_BLOCKED")) {
       return {
         account: acc.nickname, meli_user_id: String(acc.meli_user_id),
         error: "http_451_blocked", unanswered_questions: 0, pending_messages: 0,
-        ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, reputation: null,
+        ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
+        claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
+        reputation: null,
       };
     }
 
     return {
       account: acc.nickname, meli_user_id: String(acc.meli_user_id),
       error: errMsg, unanswered_questions: 0, pending_messages: 0,
-      ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, reputation: null,
+      ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
+      claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
+      reputation: null,
     };
   }
 }
