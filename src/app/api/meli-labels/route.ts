@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase, getActiveAccounts, getValidToken, meliGet, meliGetRaw, meliGetWithRetry } from "@/lib/meli";
+import { calculateZoneDistance } from "@/lib/zone-calc";
 import { PDFDocument } from "pdf-lib";
 import { inflateRawSync } from "zlib";
 
@@ -563,27 +564,77 @@ export async function POST(req: Request) {
   try {
     const { shipment_ids, shipments } = await req.json() as {
       shipment_ids: number[];
-      shipments?: Array<{ shipment_id: number; account?: string; type?: string; buyer?: string; title?: string; thumbnail?: string }>;
+      shipments?: Array<{
+        shipment_id: number;
+        account?: string;
+        type?: string;
+        buyer?: string;
+        title?: string;
+        thumbnail?: string;
+        delivery_date?: string;
+        buyer_nickname?: string;
+      }>;
     };
+
     if (!shipment_ids?.length) {
       return NextResponse.json({ error: "No shipment_ids" }, { status: 400 });
     }
+
     const supabase = getSupabase();
-    const rows = shipment_ids.map(id => {
+    const now = new Date().toISOString();
+
+    // Preparar filas para etiquetas_history
+    const historyRows = shipment_ids.map(id => {
+      const detail = shipments?.find(s => s.shipment_id === id);
+      const zone = calculateZoneDistance(detail?.delivery_date);
+
+      return {
+        shipment_id: id,
+        account_id: detail?.account ?? null,
+        shipping_type: detail?.type ?? null,
+        status: "printed",
+        buyer_name: detail?.buyer ?? null,
+        buyer_nickname: detail?.buyer_nickname ?? null,
+        product_title: detail?.title ?? null,
+        product_image_url: detail?.thumbnail ?? null,
+        zone_distance: zone,
+        printed_at: now,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+
+    // Insertar en etiquetas_history (tabla nueva)
+    const { error: historyError } = await supabase
+      .from("etiquetas_history")
+      .upsert(historyRows, { onConflict: "shipment_id" });
+
+    if (historyError) {
+      console.error("[meli-labels POST] etiquetas_history error:", historyError);
+      return NextResponse.json({ error: historyError.message }, { status: 500 });
+    }
+
+    // También guardar en meli_printed_labels para compatibilidad (legacy)
+    const legacyRows = shipment_ids.map(id => {
       const detail = shipments?.find(s => s.shipment_id === id);
       return {
         shipment_id: id,
-        account:     detail?.account ?? null,
-        type:        detail?.type ?? null,
-        buyer:       detail?.buyer ?? null,
-        title:       detail?.title ?? null,
-        thumbnail:   detail?.thumbnail ?? null,
-        printed_at:  new Date().toISOString(),
+        account: detail?.account ?? null,
+        type: detail?.type ?? null,
+        buyer: detail?.buyer ?? null,
+        title: detail?.title ?? null,
+        thumbnail: detail?.thumbnail ?? null,
+        printed_at: now,
       };
     });
-    await supabase.from("meli_printed_labels").upsert(rows, { onConflict: "shipment_id" });
+
+    await supabase.from("meli_printed_labels").upsert(legacyRows, { onConflict: "shipment_id" });
+
+    console.log(`[meli-labels POST] Marked ${shipment_ids.length} shipments as printed with zone data`);
+
     return NextResponse.json({ ok: true, marked: shipment_ids.length });
   } catch (e) {
+    console.error("[meli-labels POST] Error:", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
