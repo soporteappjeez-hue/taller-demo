@@ -1,63 +1,80 @@
 import { NextResponse } from "next/server";
+import { getActiveAccounts, getValidToken } from "@/lib/meli";
 
-const SUPA_URL    = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY    = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-export async function GET() {
-  const debug: Record<string, unknown> = {
-    supa_url_set: !!SUPA_URL,
-    anon_key_set: !!ANON_KEY,
-    service_key_set: !!SERVICE_KEY,
-    edge_url: `${SUPA_URL}/functions/v1/appjeez-meli-unify-questions`,
-  };
-
-  // Check accounts directly
+/**
+ * Debug endpoint para verificar qué está devolviendo la API de preguntas
+ * Llamá: /api/meli-questions-debug
+ */
+export async function GET(req: Request) {
   try {
-    const accRes = await fetch(
-      `${SUPA_URL}/rest/v1/meli_accounts?select=id,nickname,status,meli_user_id&status=eq.active`,
-      {
-        headers: {
-          Authorization: `Bearer ${SERVICE_KEY}`,
-          apikey: SERVICE_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    const accounts = await accRes.json();
-    debug.accounts_count = Array.isArray(accounts) ? accounts.length : "error";
-    debug.accounts = Array.isArray(accounts)
-      ? accounts.map((a: { nickname: string; meli_user_id: string }) => ({
-          nickname: a.nickname,
-          meli_user_id: a.meli_user_id,
-        }))
-      : accounts;
-  } catch (e) {
-    debug.accounts_error = (e as Error).message;
-  }
+    const accounts = await getActiveAccounts();
+    const results: any[] = [];
 
-  // Call Edge Function
-  try {
-    const efRes = await fetch(
-      `${SUPA_URL}/functions/v1/appjeez-meli-unify-questions`,
-      {
-        headers: {
-          Authorization: `Bearer ${ANON_KEY}`,
-          "x-debug": "true",
-        },
+    for (const acc of accounts.slice(0, 1)) {
+      // Solo primera cuenta para debugging
+      const token = await getValidToken(acc);
+      if (!token) {
+        results.push({ account: acc.nickname, error: "Token not available" });
+        continue;
       }
-    );
-    debug.ef_status = efRes.status;
-    debug.ef_ok = efRes.ok;
-    const body = await efRes.text();
-    try {
-      debug.ef_body = JSON.parse(body);
-    } catch {
-      debug.ef_body_raw = body.slice(0, 500);
+
+      // Obtener preguntas
+      const qRes = await fetch(
+        `https://api.mercadolibre.com/questions/search?seller_id=${acc.meli_user_id}&status=UNANSWERED&limit=5`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!qRes.ok) {
+        results.push({
+          account: acc.nickname,
+          error: "Failed to fetch questions",
+          status: qRes.status,
+        });
+        continue;
+      }
+
+      const qData = (await qRes.json()) as {
+        questions?: Array<{ id: number; item_id: string; text: string }>;
+      };
+
+      const questions = qData.questions ?? [];
+
+      for (const q of questions.slice(0, 2)) {
+        try {
+          // Obtener detalles del item
+          const iRes = await fetch(
+            `https://api.mercadolibre.com/items/${q.item_id}?attributes=id,title,thumbnail`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          const iData = (await iRes.json()) as {
+            title?: string;
+            thumbnail?: string;
+          };
+
+          results.push({
+            account: acc.nickname,
+            question_id: q.id,
+            item_id: q.item_id,
+            item_title: iData.title,
+            thumbnail_http: iData.thumbnail || "(empty)",
+            thumbnail_https:
+              (iData.thumbnail || "").replace("http://", "https://") || "(empty)",
+            meli_status: iRes.status,
+          });
+        } catch (e) {
+          results.push({
+            account: acc.nickname,
+            question_id: q.id,
+            item_id: q.item_id,
+            error: String(e),
+          });
+        }
+      }
     }
-  } catch (e) {
-    debug.ef_error = (e as Error).message;
-  }
 
-  return NextResponse.json(debug, { status: 200 });
+    return NextResponse.json(results);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
 }
