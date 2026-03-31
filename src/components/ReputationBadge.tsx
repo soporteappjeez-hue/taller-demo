@@ -45,8 +45,22 @@ export default function ReputationBadge({ levelId, levelName, powerSellerStatus 
     return null;
   };
 
+  const getPowerSellerStyles = () => {
+    if (powerSellerStatus === "platinum") {
+      return { bg: "#C0C0C015", text: "#C0C0C0", border: "#C0C0C033" }; // Plateado
+    }
+    if (powerSellerStatus === "gold") {
+      return { bg: "#FFD70015", text: "#FFD700", border: "#FFD70033" }; // Dorado
+    }
+    if (powerSellerStatus === "mercadolider") {
+      return { bg: "#FF6B3515", text: "#FF6B35", border: "#FF6B3533" }; // Naranja/Rojo
+    }
+    return { bg: "#FFFFFF15", text: "#FFFFFF", border: "#FFFFFF33" }; // Default blanco
+  };
+
   const icon = getPowerSellerIcon();
   const label = getPowerSellerLabel();
+  const powerSellerStyles = getPowerSellerStyles();
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -68,9 +82,9 @@ export default function ReputationBadge({ levelId, levelName, powerSellerStatus 
         <div
           className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold"
           style={{
-            background: "#FFD70015",
-            color: "#FFD700",
-            border: "1px solid #FFD70033",
+            background: powerSellerStyles.bg,
+            color: powerSellerStyles.text,
+            border: `1px solid ${powerSellerStyles.border}`,
           }}
         >
           {icon}

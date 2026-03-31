@@ -3,7 +3,6 @@
 import { MessageCircle, MessageSquare, Truck, Package, Pencil, Check, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useMeliAccountData } from "@/hooks/useMeliAccountData";
 import ReputationBadge from "@/components/ReputationBadge";
-import ItemsTable from "@/components/ItemsTable";
 
 interface Reputation {
   level_id: string | null;
@@ -228,37 +227,29 @@ export default function CompactAccountRow({
                 </div>
               )}
 
-              {/* Tabla de publicaciones con stock */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6B7280" }}>
-                  Publicaciones Activas
-                </p>
-                <ItemsTable items={meliData.items} stats={meliData.stats} />
+              {/* Métricos rápidas - Preguntas, Mensajes, Envíos */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+                <MetricCard
+                  icon={<MessageCircle className="w-3.5 h-3.5" />}
+                  label="Preguntas"
+                  value={data.unanswered_questions ?? 0}
+                  color="#FF5722"
+                />
+                <MetricCard
+                  icon={<MessageSquare className="w-3.5 h-3.5" />}
+                  label="Mensajes"
+                  value={data.pending_messages ?? 0}
+                  color="#FF9800"
+                />
+                <MetricCard
+                  icon={<Truck className="w-3.5 h-3.5" />}
+                  label="Envíos"
+                  value={data.ready_to_ship ?? 0}
+                  color="#00E5FF"
+                />
               </div>
             </>
           )}
-
-          {/* Métricos rápidas - Preguntas, Mensajes, Envíos */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
-            <MetricCard
-              icon={<MessageCircle className="w-3.5 h-3.5" />}
-              label="Preguntas"
-              value={data.unanswered_questions ?? 0}
-              color="#FF5722"
-            />
-            <MetricCard
-              icon={<MessageSquare className="w-3.5 h-3.5" />}
-              label="Mensajes"
-              value={data.pending_messages ?? 0}
-              color="#FF9800"
-            />
-            <MetricCard
-              icon={<Truck className="w-3.5 h-3.5" />}
-              label="Envíos"
-              value={data.ready_to_ship ?? 0}
-              color="#00E5FF"
-            />
-          </div>
         </div>
       )}
     </div>
