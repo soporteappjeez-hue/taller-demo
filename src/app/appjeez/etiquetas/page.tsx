@@ -203,6 +203,54 @@ function EtiquetasInner() {
     }
   };
 
+  const handlePrintAll = async () => {
+    if (filtered.length === 0) return;
+    setPrinting(true);
+    try {
+      // Obtener IDs de todas las etiquetas del filtro actual
+      const ids = filtered.map(s => s.shipment_id).join(",");
+      
+      // Descargar PDF consolidado
+      const res = await fetch(`/api/meli-labels?ids=${ids}`);
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `etiquetas-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      // Marcar todas como impresas
+      await Promise.all(
+        filtered.map(s =>
+          fetch("/api/meli-labels", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shipment_id: s.shipment_id, status: "printed" }),
+          })
+        )
+      );
+
+      // Actualizar estado local
+      setData(prev => prev ? {
+        ...prev,
+        shipments: prev.shipments.map(s =>
+          filtered.some(f => f.shipment_id === s.shipment_id)
+            ? { ...s, printed_at: new Date().toISOString() }
+            : s
+        ),
+      } : null);
+    } catch (e) {
+      console.error("Error printing all:", e);
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen pb-24" style={{ background: "#121212" }}>
       {/* Header */}
@@ -317,6 +365,34 @@ function EtiquetasInner() {
                 );
               })}
             </div>
+
+            {/* Botón Imprimir Todas las Pendientes */}
+            {statusTab === "pending" && filtered.length > 0 && (
+              <div className="mb-4 flex justify-center">
+                <button
+                  onClick={handlePrintAll}
+                  disabled={printing}
+                  className="px-6 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
+                  style={{
+                    background: "#39FF14",
+                    color: "#121212",
+                    opacity: printing ? 0.6 : 1,
+                  }}
+                >
+                  {printing ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Imprimir Todas ({filtered.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Lista de Etiquetas */}
             {filtered.length === 0 ? (

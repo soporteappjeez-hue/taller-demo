@@ -363,8 +363,12 @@ export async function GET(req: Request) {
             if (Array.isArray(res)) {
               for (const e of res) {
                 if (e.code === 200 && e.body?.id) {
-                  const img = e.body.secure_thumbnail || e.body.thumbnail;
-                  if (img) thumbnailMap.set(e.body.id, img);
+                  let img = e.body.secure_thumbnail || e.body.thumbnail;
+                  if (img) {
+                    // Fix duplicated protocol: http://http2.mlstatic.com → https://http2.mlstatic.com
+                    img = img.replace(/^https?:\/\/https?:\/\//, "https://").replace(/^http:\/\//, "https://");
+                    thumbnailMap.set(e.body.id, img);
+                  }
                 }
               }
             }
