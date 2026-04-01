@@ -525,75 +525,88 @@ function EtiquetasInner() {
       }
 
       // PASO 4: Convertir blob a base64 y guardar en historial (batch)
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(",")[1];
+      // Usar Promesa para envolver FileReader (callback-based)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = (reader.result as string).split(",")[1];
+          resolve(result);
+        };
+        reader.onerror = () => {
+          reject(new Error("Failed to read PDF blob"));
+        };
+        reader.readAsDataURL(pdfBlob);
+      });
 
-        // Preparar metadata de los shipments válidos
-        const shipmentsToSave = selectedShipments
-          .filter(s => valid.includes(s.shipment_id))
-          .map(s => ({
+      // Preparar metadata de los shipments válidos
+      const shipmentsToSave = selectedShipments
+        .filter(s => valid.includes(s.shipment_id))
+        .map(s => ({
+          shipment_id: s.shipment_id,
+          order_id: s.order_id,
+          tracking_number: (s as any).tracking_number || null,
+          buyer_nickname: s.buyer_nickname || null,
+          sku: s.seller_sku || null,
+          variation: s.attributes || null,
+          quantity: s.quantity,
+          account_id: s.account,
+          meli_user_id: s.meli_user_id,
+          shipping_method: s.type,
+        }));
+
+      console.log("🔄 Saving print history...", { shipmentsToSave, baseLength: base64.length });
+
+      // POST a save-print-batch
+      const saveRes = await fetch("/api/meli-labels/save-print-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shipments: shipmentsToSave,
+          pdf_base64: base64,
+          tzOffset,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const errorData = await saveRes.json();
+        console.error("❌ Save failed:", errorData);
+        throw new Error(`Failed to save to history: ${errorData.error || "Unknown error"}`);
+      }
+
+      const saveData = await saveRes.json();
+      console.log("✅ Saved successfully:", saveData);
+
+      // PASO 5: Solo después de guardar exitosamente, marcar como impresas
+      const markRes = await fetch("/api/meli-labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "mark-printed",
+          shipment_ids: valid,
+          shipments: shipmentsToSave.map(s => ({
             shipment_id: s.shipment_id,
-            order_id: s.order_id,
-            tracking_number: (s as any).tracking_number || null,
-            buyer_nickname: s.buyer_nickname || null,
-            sku: s.seller_sku || null,
-            variation: s.attributes || null,
-            quantity: s.quantity,
-            account_id: s.account,
-            meli_user_id: s.meli_user_id,
-            shipping_method: s.type,
-          }));
+            account: s.account_id,
+            type: s.shipping_method,
+            buyer: "", // No usado en este contexto
+            title: "",
+            thumbnail: "",
+            delivery_date: "",
+            buyer_nickname: s.buyer_nickname,
+          })),
+        }),
+      });
 
-        // POST a save-print-batch
-        const saveRes = await fetch("/api/meli-labels/save-print-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            shipments: shipmentsToSave,
-            pdf_base64: base64,
-            tzOffset,
-          }),
-        });
+      if (!markRes.ok) {
+        console.warn("⚠️ Failed to mark as printed, but PDF was saved");
+      }
 
-        if (!saveRes.ok) {
-          const errorData = await saveRes.json();
-          throw new Error(`Failed to save to history: ${errorData.error || "Unknown error"}`);
-        }
-
-        // PASO 5: Solo después de guardar exitosamente, marcar como impresas
-        const markRes = await fetch("/api/meli-labels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "mark-printed",
-            shipment_ids: valid,
-            shipments: shipmentsToSave.map(s => ({
-              shipment_id: s.shipment_id,
-              account: s.account_id,
-              type: s.shipping_method,
-              buyer: "", // No usado en este contexto
-              title: "",
-              thumbnail: "",
-              delivery_date: "",
-              buyer_nickname: s.buyer_nickname,
-            })),
-          }),
-        });
-
-        if (!markRes.ok) {
-          console.warn("Failed to mark as printed, but PDF was saved");
-        }
-
-        // Actualizar estado local
-        setSelectedIds(new Set());
-        load(); // Re-fetch para actualizar contadores
-      };
-
-      reader.readAsDataURL(pdfBlob);
+      // Actualizar estado local
+      setSelectedIds(new Set());
+      alert(`✅ ${valid.length} etiqueta(s) impresa(s) y guardada(s) en historial`);
+      load(); // Re-fetch para actualizar contadores
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      alert(`Error: ${msg}`);
+      alert(`❌ Error: ${msg}`);
       console.error("Print error:", e);
     } finally {
       setPrinting(false);
