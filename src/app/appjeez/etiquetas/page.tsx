@@ -300,6 +300,8 @@ function EtiquetasInner() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [printMode, setPrintMode] = useState<'thermal' | 'pdf'>('thermal');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -417,6 +419,33 @@ function EtiquetasInner() {
     
     return map;
   }, [data?.shipments]);
+
+  // Handler para imprimir etiqueta de prueba (sandbox)
+  const handlePrintTest = async () => {
+    setTestLoading(true);
+    try {
+      const res = await fetch("/api/meli-labels/test-print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to create test label");
+      }
+
+      const result = await res.json();
+      console.log("✅ Test label created:", result);
+      alert(`🧪 Etiqueta de prueba creada exitosamente!\n\nShipment: ${result.test_data.shipment_id}\n\nRevisá el historial para buscarla.`);
+      load(); // Refrescar para actualizar contadores
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      alert(`❌ Error en modo test: ${msg}`);
+      console.error("Test print error:", e);
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   // Verificar duplicados al cargar
   useEffect(() => {
@@ -669,17 +698,54 @@ function EtiquetasInner() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Badge Modo Test */}
+          {testMode && (
+            <span
+              className="px-3 py-2 rounded-lg text-xs font-bold animate-pulse"
+              style={{
+                background: "rgba(57,255,20,0.2)",
+                color: "#39FF14",
+                border: "1px solid rgba(57,255,20,0.5)",
+              }}
+            >
+              🧪 MODO PRUEBA
+            </span>
+          )}
           <Link
             href="/appjeez/historial-etiquetas"
             className="px-3 py-2 rounded-lg text-xs font-semibold transition-all"
             style={{
-              background: "rgba(57,255,20,0.1)",
-              color: "#39FF14",
-              border: "1px solid rgba(57,255,20,0.3)"
+              background: testMode ? "rgba(255,255,255,0.05)" : "rgba(57,255,20,0.1)",
+              color: testMode ? "#9CA3AF" : "#39FF14",
+              border: testMode ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(57,255,20,0.3)",
             }}
           >
             📋 Historial
           </Link>
+          {/* Botón Modo Test */}
+          <button
+            onClick={handlePrintTest}
+            disabled={testLoading}
+            className="px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+            style={{
+              background: testMode ? "#39FF14" : "rgba(57,255,20,0.1)",
+              color: testMode ? "#121212" : "#39FF14",
+              border: "1px solid rgba(57,255,20,0.3)",
+              opacity: testLoading ? 0.6 : 1,
+            }}
+            title="Generar etiqueta de prueba (sandbox)"
+          >
+            {testLoading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>
+                🧪 Test
+              </>
+            )}
+          </button>
           <button
             onClick={load}
             disabled={loading}

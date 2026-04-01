@@ -265,7 +265,17 @@ export default function HistorialEtiquetasPage() {
                         className="w-4 h-4"
                       />
                     </td>
-                    <td className="px-4 py-3 text-white">{label.shipment_id}</td>
+                    <td className="px-4 py-3 text-white">
+                      {label.buyer_nickname === "USUARIO_TEST" && (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold mr-2 mb-1"
+                          style={{ background: "rgba(57,255,20,0.2)", color: "#39FF14" }}
+                        >
+                          🧪 TEST
+                        </span>
+                      )}
+                      {label.shipment_id}
+                    </td>
                     <td className="px-4 py-3" style={{ color: "#9CA3AF" }}>
                       {label.sku || "-"}
                     </td>
