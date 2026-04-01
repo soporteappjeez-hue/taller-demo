@@ -67,18 +67,23 @@ const TYPE_CFG: Record<LogisticType, { color: string; label: string; icon: React
 const getAccountColor = (meli_user_id: string, accountName: string): { bg: string; text: string; border: string } => {
   const colors = [
     { bg: "#FF6B6B", text: "#fff", border: "#ff5252" },      // Rojo
-    { bg: "#4ECDC4", text: "#fff", border: "#45b7a8" },      // Turquesa
+    { bg: "#4ECDC4", text: "#121212", border: "#45b7a8" },    // Turquesa
     { bg: "#45B7D1", text: "#fff", border: "#3da5b8" },      // Azul
-    { bg: "#FFA07A", text: "#fff", border: "#ff8c6a" },      // Naranja
-    { bg: "#98D8C8", text: "#fff", border: "#82c5b7" },      // Verde menta
-    { bg: "#F7DC6F", text: "#333", border: "#e6c900" },      // Amarillo
-    { bg: "#BB8FCE", text: "#fff", border: "#a878b5" },      // Púrpura
-    { bg: "#85C1E2", text: "#fff", border: "#6fb3d5" },      // Azul claro
+    { bg: "#FF9F43", text: "#121212", border: "#ff8c2a" },    // Naranja
+    { bg: "#A29BFE", text: "#fff", border: "#8c84e8" },      // Violeta
+    { bg: "#55EFC4", text: "#121212", border: "#3fd4a8" },    // Verde neon
+    { bg: "#FD79A8", text: "#fff", border: "#e8608c" },      // Rosa
+    { bg: "#FFEAA7", text: "#121212", border: "#e6d490" },    // Amarillo
   ];
   
-  // Usar hash del meli_user_id para asignar color consistente
-  const hash = meli_user_id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const colorIndex = hash % colors.length;
+  // Usar hash combinado de meli_user_id + nombre para mejor distribución
+  const str = meli_user_id + accountName;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const colorIndex = Math.abs(hash) % colors.length;
   
   return colors[colorIndex];
 };
@@ -168,11 +173,24 @@ function LabelCard({
                 style={{ background: cfg.color, color: "#121212" }}>
                 {cfg.label}
               </span>
-              <ZoneIndicator zone={zone} />
+              {/* Zona solo para Flex - prominente */}
+              {shipment.type === "flex" && (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full"
+                  style={{
+                    background: zoneCfg.bgColor,
+                    color: zoneCfg.color,
+                    border: `2px solid ${zoneCfg.color}`,
+                  }}>
+                  {zone === "cercana" && "📍 ZONA CERCANA"}
+                  {zone === "media" && "📍 ZONA MEDIA"}
+                  {zone === "larga" && "📍 ZONA LARGA"}
+                  {zone === "desconocida" && "📍 ZONA ?"}
+                </span>
+              )}
               {shipment.printed_at && (
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
                   style={{ background: "#10B981", color: "#fff" }}>
-                  ✅ Impresa
+                  Impresa
                 </span>
               )}
             </div>
@@ -979,22 +997,113 @@ function EtiquetasInner() {
                 <CheckCircle2 className="w-8 h-8" style={{ color: "#39FF14" }} />
                 <p className="text-white font-bold">Sin etiquetas en este filtro</p>
                 <p className="text-xs" style={{ color: "#6B7280" }}>
-                  {statusTab === "pending" && "Todas las pendientes están impresas ✓"}
+                  {statusTab === "pending" && "Todas las pendientes estan impresas"}
                   {statusTab === "printed" && "No hay etiquetas impresas todavia"}
                   {statusTab === "in_transit" && "No hay envios en transito"}
                   {statusTab === "returns" && "No hay devoluciones"}
                 </p>
               </div>
-            ) : (
+            ) : statusTab === "pending" ? (() => {
+              // Agrupar pendientes en "Envios de hoy" vs "Proximos envios"
+              const now = new Date();
+              const todayStr = now.toISOString().split("T")[0];
+              const todayShipments = filtered.filter(s => {
+                if (!s.dispatch_date) return true; // Sin fecha = asumir hoy
+                const d = s.dispatch_date.split("T")[0];
+                return d <= todayStr;
+              });
+              const futureShipments = filtered.filter(s => {
+                if (!s.dispatch_date) return false;
+                const d = s.dispatch_date.split("T")[0];
+                return d > todayStr;
+              });
+
+              // Agrupar futuros por fecha
+              const futureByDate = new Map<string, ShipmentInfo[]>();
+              futureShipments.forEach(s => {
+                const d = (s.dispatch_date || "").split("T")[0];
+                if (!futureByDate.has(d)) futureByDate.set(d, []);
+                futureByDate.get(d)!.push(s);
+              });
+              const sortedDates = Array.from(futureByDate.keys()).sort();
+
+              const formatDate = (dateStr: string) => {
+                const date = new Date(dateStr + "T12:00:00");
+                const dias = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+                const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                return `${dias[date.getDay()]} ${date.getDate()} ${meses[date.getMonth()]}`;
+              };
+
+              return (
+                <div className="space-y-4">
+                  {/* Envios de Hoy */}
+                  {todayShipments.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2 px-1">
+                        <span className="text-xs font-black px-3 py-1 rounded-full"
+                          style={{ background: "#FF6B6B", color: "#fff" }}>
+                          ENVIOS DE HOY
+                        </span>
+                        <span className="text-[10px] font-bold" style={{ color: "#9CA3AF" }}>
+                          {todayShipments.length} {todayShipments.length === 1 ? "envio" : "envios"}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {todayShipments.map(shipment => (
+                          <LabelCard
+                            key={shipment.shipment_id}
+                            shipment={shipment}
+                            tabContext={statusTab}
+                            onPrinted={handlePrinted}
+                            isSelected={selectedIds.has(shipment.shipment_id)}
+                            onToggleSelection={toggleSelection}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Proximos Envios (agrupados por fecha) */}
+                  {sortedDates.map(dateStr => {
+                    const items = futureByDate.get(dateStr)!;
+                    return (
+                      <div key={dateStr}>
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <span className="text-xs font-black px-3 py-1 rounded-full"
+                            style={{ background: "#FFE600", color: "#121212" }}>
+                            DESPACHAR: {formatDate(dateStr)}
+                          </span>
+                          <span className="text-[10px] font-bold" style={{ color: "#9CA3AF" }}>
+                            {items.length} {items.length === 1 ? "envio" : "envios"}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {items.map(shipment => (
+                            <LabelCard
+                              key={shipment.shipment_id}
+                              shipment={shipment}
+                              tabContext={statusTab}
+                              onPrinted={handlePrinted}
+                              isSelected={selectedIds.has(shipment.shipment_id)}
+                              onToggleSelection={toggleSelection}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })() : (
               <div className="space-y-2">
                 {filtered.map(shipment => (
                   <LabelCard
                     key={shipment.shipment_id}
                     shipment={shipment}
                     tabContext={statusTab}
-                    onPrinted={(statusTab === "pending" || statusTab === "printed") ? handlePrinted : undefined}
+                    onPrinted={statusTab === "printed" ? handlePrinted : undefined}
                     isSelected={selectedIds.has(shipment.shipment_id)}
-                    onToggleSelection={(statusTab === "pending" || statusTab === "printed") ? toggleSelection : undefined}
+                    onToggleSelection={statusTab === "printed" ? toggleSelection : undefined}
                   />
                 ))}
               </div>
