@@ -56,21 +56,22 @@ function getPeriodDates(
   const from = new Date();
   
   // Ajustar a zona horaria local del usuario
-  const offsetMs = tzOffset * 3600000; // Convertir horas a ms
-  from.setTime(from.getTime() - offsetMs);
-  to.setTime(to.getTime() - offsetMs);
+  // tzOffset es negativo para UTC-3 (UTC-3 = UTC menos 3 horas)
+  // Para convertir de UTC a UTC-3, restamos 3 horas: getTime() + (-3) * 3600000
+  const offsetMs = tzOffset * 3600000;
+  from.setTime(from.getTime() + offsetMs);
+  to.setTime(to.getTime() + offsetMs);
   
   if (period === "today") {
-    // Usar setHours (no setUTCHours) porque ya está ajustado con setTime()
-    from.setHours(0, 0, 0, 0);
-    to.setHours(23, 59, 59, 999);
+    from.setUTCHours(0, 0, 0, 0);
+    to.setUTCHours(23, 59, 59, 999);
     return { from, to, days: 1 };
   }
   
   const days = period === "30d" ? 30 : 7;
-  from.setDate(from.getDate() - days + 1);
-  from.setHours(0, 0, 0, 0);
-  to.setHours(23, 59, 59, 999);
+  from.setUTCDate(from.getUTCDate() - days + 1);
+  from.setUTCHours(0, 0, 0, 0);
+  to.setUTCHours(23, 59, 59, 999);
   return { from, to, days };
 }
 

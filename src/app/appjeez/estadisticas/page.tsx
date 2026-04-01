@@ -232,10 +232,17 @@ export default function EstadisticasPage() {
               </p>
             </div>
           </div>
-          <button onClick={load} disabled={loading}
-            className="p-2 rounded-xl transition-all" style={{ background: "#1F1F1F" }}>
-            <RefreshCw className={`w-4 h-4 text-gray-400 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Fecha actual */}
+            <div className="hidden sm:block text-right" style={{ fontSize: "11px", color: "#9CA3AF" }}>
+              <p>{new Date().toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "short" })}</p>
+              <p style={{ color: "#6B7280" }}>{new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+            </div>
+            <button onClick={load} disabled={loading}
+              className="p-2 rounded-xl transition-all" style={{ background: "#1F1F1F" }}>
+              <RefreshCw className={`w-4 h-4 text-gray-400 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         <div className="px-4 py-4 space-y-4 max-w-4xl mx-auto pb-24">
