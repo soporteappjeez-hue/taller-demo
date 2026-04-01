@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabaseAdmin = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseServiceKey || "placeholder-key"
+);
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,24 +17,22 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q") || "";
     const accountId = searchParams.get("account_id") || "";
     const meliUserId = searchParams.get("meli_user_id") || "";
-    const field = searchParams.get("field") || "all"; // sku, tracking, buyer, shipment_id, all
+    const loadAll = searchParams.get("all") === "true";
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    if (q.length < 2) {
-      return NextResponse.json({
-        results: [],
-        total: 0,
-      });
+    // Si no hay query y no es loadAll, devolver vacío
+    if (q.length < 2 && !loadAll) {
+      return NextResponse.json({ results: [], total: 0 });
     }
 
-    // Construir query base
-    let query = supabase
+    // Construir query base con service role key (sin problemas de RLS)
+    let query = supabaseAdmin
       .from("printed_labels")
       .select("*")
       .order("print_date", { ascending: false })
       .limit(limit);
 
-    // Filtrar por meli_user_id (seguridad)
+    // Filtrar por meli_user_id (opcional)
     if (meliUserId) {
       query = query.eq("meli_user_id", meliUserId) as typeof query;
     }
@@ -34,35 +42,17 @@ export async function GET(req: NextRequest) {
       query = query.eq("account_id", accountId) as typeof query;
     }
 
-    // Buscar con OR unificado (una sola query)
-    const searchTerm = `%${q}%`;
-    
-    // Construir filtro OR dinámicamente
-    let orFilters: string[] = [];
-    
-    if (field === "sku" || field === "all") {
-      orFilters.push(`sku.ilike.${searchTerm}`);
+    // Si hay query de búsqueda, aplicar filtros OR
+    if (q.length >= 2) {
+      const searchTerm = `%${q}%`;
+      const orFilters: string[] = [
+        `sku.ilike.${searchTerm}`,
+        `tracking_number.ilike.${searchTerm}`,
+        `buyer_nickname.ilike.${searchTerm}`,
+        `shipment_id::text.ilike.${searchTerm}`,
+      ];
+      query = query.or(orFilters.join(",")) as typeof query;
     }
-    if (field === "tracking" || field === "all") {
-      orFilters.push(`tracking_number.ilike.${searchTerm}`);
-    }
-    if (field === "buyer" || field === "all") {
-      orFilters.push(`buyer_nickname.ilike.${searchTerm}`);
-    }
-    if (field === "shipment_id" || field === "all") {
-      // Para shipment_id, hacer casting a text y buscar
-      orFilters.push(`shipment_id::text.ilike.${searchTerm}`);
-    }
-
-    if (orFilters.length === 0) {
-      return NextResponse.json({
-        results: [],
-        total: 0,
-      });
-    }
-
-    // Aplicar OR filter de una sola vez
-    query = query.or(orFilters.join(",")) as typeof query;
 
     const { data: results, error } = await query;
 

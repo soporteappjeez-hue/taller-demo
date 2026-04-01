@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { ArrowLeft, Download, Search, Loader2, RefreshCw } from "lucide-react";
 
@@ -31,19 +30,15 @@ export default function HistorialEtiquetasPage() {
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<ShippingMethod>("todas");
 
-  // Cargar todas las etiquetas recientes al montar
+  // Cargar todas las etiquetas recientes via API (server-side, sin problemas de API key)
   const loadLabels = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: dbError } = await supabase
-        .from("printed_labels")
-        .select("*")
-        .order("print_date", { ascending: false })
-        .limit(200);
-
-      if (dbError) throw new Error(dbError.message);
-      setAllLabels((data as PrintedLabel[]) || []);
+      const res = await fetch("/api/meli-labels/search?q=&limit=200&all=true");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setAllLabels((data.results as PrintedLabel[]) || []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -53,24 +48,6 @@ export default function HistorialEtiquetasPage() {
 
   useEffect(() => {
     loadLabels();
-  }, [loadLabels]);
-
-  // Realtime: escuchar nuevas inserciones
-  useEffect(() => {
-    const channel = supabase
-      .channel("historial-labels-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "printed_labels" },
-        () => {
-          loadLabels();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [loadLabels]);
 
   // Filtrar por búsqueda y tipo
