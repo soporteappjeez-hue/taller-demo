@@ -109,8 +109,7 @@ export async function POST(req: NextRequest) {
         shipping_method: s.shipping_method,
         file_path: publicUrl,
         print_date: now.toISOString(),
-        source: "app_manual" as const,
-        synced_at: now.toISOString(),
+        // Remover campos que no existen: source, synced_at
       }));
 
       // Insertar registros usando upsert (admin client)
