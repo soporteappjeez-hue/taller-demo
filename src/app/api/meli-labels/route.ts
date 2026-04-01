@@ -721,15 +721,16 @@ export async function POST(req: Request) {
 
       return {
         shipment_id: id,
-        account_id: detail?.account ?? null,
-        shipping_type: detail?.type ?? null,
+        account_id: detail?.account_id || detail?.account || null,
+        shipping_type: detail?.shipping_method || detail?.type || null,
         status: "printed",
-        buyer_name: detail?.buyer ?? null,
+        buyer_name: detail?.buyer_name || detail?.buyer || null,
         buyer_nickname: detail?.buyer_nickname ?? null,
         product_title: detail?.title ?? null,
         product_image_url: detail?.thumbnail ?? null,
         zone_distance: zone,
         printed_at: now,
+        label_url: detail?.label_url ?? null,
         created_at: now,
         updated_at: now,
       };
