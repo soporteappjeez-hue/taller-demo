@@ -521,18 +521,22 @@ function EtiquetasInner() {
     }
 
     // Filtrar por tiempo (solo para pendientes)
+    // Regla: después de las 13:00, los envíos de "hoy" pasan a "próximos"
     if (statusTab === "pending" && timeFilter !== "all") {
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const cutoffPassed = now.getHours() >= 13;
       if (timeFilter === "today") {
         source = source.filter(s => {
-          if (!s.dispatch_date) return true;
-          return s.dispatch_date.split("T")[0] <= todayStr;
+          if (!s.dispatch_date) return !cutoffPassed;
+          const d = s.dispatch_date.split("T")[0];
+          return cutoffPassed ? d < todayStr : d <= todayStr;
         });
       } else if (timeFilter === "upcoming") {
         source = source.filter(s => {
-          if (!s.dispatch_date) return false;
-          return s.dispatch_date.split("T")[0] > todayStr;
+          if (!s.dispatch_date) return cutoffPassed;
+          const d = s.dispatch_date.split("T")[0];
+          return cutoffPassed ? d >= todayStr : d > todayStr;
         });
       }
     }
@@ -554,17 +558,21 @@ function EtiquetasInner() {
   }, [data]);
 
   // Conteo de envios hoy vs proximos (solo pendientes)
+  // Regla: después de las 13:00 Argentina, los envíos de "hoy" pasan a "próximos"
   const timeCounts = useMemo(() => {
     const source = data?.shipments ?? [];
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const cutoffPassed = now.getHours() >= 13; // Corte 13:00 - después ya no se despacha hoy
     const today = source.filter(s => {
-      if (!s.dispatch_date) return true;
-      return s.dispatch_date.split("T")[0] <= todayStr;
+      if (!s.dispatch_date) return !cutoffPassed;
+      const d = s.dispatch_date.split("T")[0];
+      return cutoffPassed ? d < todayStr : d <= todayStr;
     }).length;
     const upcoming = source.filter(s => {
-      if (!s.dispatch_date) return false;
-      return s.dispatch_date.split("T")[0] > todayStr;
+      if (!s.dispatch_date) return cutoffPassed;
+      const d = s.dispatch_date.split("T")[0];
+      return cutoffPassed ? d >= todayStr : d > todayStr;
     }).length;
     return { today, upcoming };
   }, [data?.shipments]);
@@ -913,39 +921,26 @@ function EtiquetasInner() {
 
             {/* Filtros Logísticos + Filtro de Tiempo */}
             <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1">
-              {(["todas", "flex", "correo", "turbo", "full"] as LogisticType[]).map(type => {
-                const isAll = type === "todas";
-                const cfg = isAll ? { color: "#fff", icon: "📦", label: "TODAS" } : TYPE_CFG[type];
-                const count = countByType(type, statusTab);
-                const isActive = logisticFilter === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => { setLogisticFilter(type); setTimeFilter("all"); }}
-                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
-                    style={
-                      isActive
-                        ? { background: isAll ? "#FFE600" : cfg.color, color: "#121212", border: `2px solid ${isAll ? "#FFE600" : cfg.color}` }
-                        : {
-                          background: "transparent",
-                          color: isAll ? "#9CA3AF" : cfg.color,
-                          border: `2px solid ${isAll ? "#9CA3AF" : cfg.color}40`,
-                        }
-                    }
-                  >
-                    {cfg.icon}
-                    {cfg.label}
-                    <span className="text-[9px] font-black px-1">{count}</span>
-                  </button>
-                );
-              })}
+              {/* Botón TODAS */}
+              <button
+                onClick={() => { setLogisticFilter("todas"); setTimeFilter("all"); }}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
+                style={
+                  logisticFilter === "todas" && timeFilter === "all"
+                    ? { background: "#FFE600", color: "#121212", border: "2px solid #FFE600" }
+                    : { background: "transparent", color: "#9CA3AF", border: "2px solid #9CA3AF40" }
+                }
+              >
+                <span className="text-xs">📦</span>
+                TODAS
+                <span className="text-[9px] font-black px-1">{countByType("todas", statusTab)}</span>
+              </button>
 
-              {/* Separador + Filtros HOY / PROXIMOS (solo en Pendientes) */}
+              {/* Botones HOY / PROXIMOS (solo en Pendientes, justo al lado de TODAS) */}
               {statusTab === "pending" && (
                 <>
-                  <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.15)" }} />
                   <button
-                    onClick={() => setTimeFilter(timeFilter === "today" ? "all" : "today")}
+                    onClick={() => { setTimeFilter(timeFilter === "today" ? "all" : "today"); setLogisticFilter("todas"); }}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
                     style={
                       timeFilter === "today"
@@ -957,7 +952,7 @@ function EtiquetasInner() {
                     <span className="text-[9px] font-black px-1">{timeCounts.today}</span>
                   </button>
                   <button
-                    onClick={() => setTimeFilter(timeFilter === "upcoming" ? "all" : "upcoming")}
+                    onClick={() => { setTimeFilter(timeFilter === "upcoming" ? "all" : "upcoming"); setLogisticFilter("todas"); }}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
                     style={
                       timeFilter === "upcoming"
@@ -970,6 +965,32 @@ function EtiquetasInner() {
                   </button>
                 </>
               )}
+
+              {/* Separador */}
+              <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.15)" }} />
+
+              {/* Filtros por tipo logístico */}
+              {(["flex", "correo", "turbo", "full"] as LogisticType[]).map(type => {
+                const cfg = TYPE_CFG[type];
+                const count = countByType(type, statusTab);
+                const isActive = logisticFilter === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => { setLogisticFilter(type); setTimeFilter("all"); }}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
+                    style={
+                      isActive
+                        ? { background: cfg.color, color: "#121212", border: `2px solid ${cfg.color}` }
+                        : { background: "transparent", color: cfg.color, border: `2px solid ${cfg.color}40` }
+                    }
+                  >
+                    {cfg.icon}
+                    {cfg.label}
+                    <span className="text-[9px] font-black px-1">{count}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Barra de Acciones: Marcar Todas + Imprimir (solo en tabs imprimibles) */}
@@ -1073,22 +1094,23 @@ function EtiquetasInner() {
               </div>
             ) : statusTab === "pending" ? (() => {
               // Agrupar pendientes en "Envios de hoy" vs "Proximos envios"
-              // Usar hora local Argentina (no UTC)
+              // Regla: después de las 13:00, todo pasa a "próximos"
               const now = new Date();
               const localYear = now.getFullYear();
               const localMonth = String(now.getMonth() + 1).padStart(2, "0");
               const localDay = String(now.getDate()).padStart(2, "0");
               const todayStr = `${localYear}-${localMonth}-${localDay}`;
+              const cutoffPassed = now.getHours() >= 13;
 
               const todayShipments = filtered.filter(s => {
-                if (!s.dispatch_date) return true; // Sin fecha = asumir hoy
+                if (!s.dispatch_date) return !cutoffPassed;
                 const d = s.dispatch_date.split("T")[0];
-                return d <= todayStr;
+                return cutoffPassed ? d < todayStr : d <= todayStr;
               });
               const futureShipments = filtered.filter(s => {
-                if (!s.dispatch_date) return false;
+                if (!s.dispatch_date) return cutoffPassed;
                 const d = s.dispatch_date.split("T")[0];
-                return d > todayStr;
+                return cutoffPassed ? d >= todayStr : d > todayStr;
               });
 
               // Agrupar futuros por fecha
