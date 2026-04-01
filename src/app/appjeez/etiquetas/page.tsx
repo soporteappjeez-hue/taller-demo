@@ -107,13 +107,25 @@ function LabelCard({
   const zoneCfg = ZONE_CFG[zone];
   const thumb = (shipment.thumbnail || "").replace("http://", "https://");
 
+  // Calcular si está demorada (dispatch_date pasó de las 00:00 del día)
+  const isDelayed = (() => {
+    if (!shipment.dispatch_date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dispDate = new Date(shipment.dispatch_date);
+    return dispDate < today;
+  })();
+  const delayDays = isDelayed && shipment.dispatch_date
+    ? Math.floor((new Date().setHours(0,0,0,0) - new Date(shipment.dispatch_date).getTime()) / 86400000)
+    : 0;
+
   return (
     <div
       className="rounded-2xl overflow-hidden mb-3 flex items-start gap-4 p-3 relative transition-all"
       style={{ 
         background: "#1A1A1A", 
-        border: isSelected ? "2px solid #39FF14" : "1px solid rgba(255,255,255,0.06)",
-        boxShadow: isSelected ? "0 0 12px rgba(57, 255, 20, 0.3)" : "none",
+        border: isDelayed ? "2px solid #EF4444" : isSelected ? "2px solid #39FF14" : "1px solid rgba(255,255,255,0.06)",
+        boxShadow: isDelayed ? "0 0 12px rgba(239, 68, 68, 0.3)" : isSelected ? "0 0 12px rgba(57, 255, 20, 0.3)" : "none",
       }}
     >
       {/* Checkbox en esquina superior izquierda */}
@@ -174,6 +186,13 @@ function LabelCard({
                 style={{ background: cfg.color, color: "#121212" }}>
                 {cfg.label}
               </span>
+              {/* Badge DEMORADA */}
+              {isDelayed && (
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse"
+                  style={{ background: "#EF4444", color: "#fff" }}>
+                  DEMORADA {delayDays > 0 ? `${delayDays}d` : ""}
+                </span>
+              )}
               {/* Zona solo para Flex - prominente */}
               {shipment.type === "flex" && (
                 <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full"
@@ -1093,8 +1112,8 @@ function EtiquetasInner() {
                 </p>
               </div>
             ) : statusTab === "pending" ? (() => {
-              // Agrupar pendientes en "Envios de hoy" vs "Proximos envios"
-              // Regla: después de las 13:00, todo pasa a "próximos"
+              // Agrupar pendientes: DEMORADAS → HOY → PRÓXIMOS
+              // Regla: después de las 13:00, envíos de hoy pasan a "próximos"
               const now = new Date();
               const localYear = now.getFullYear();
               const localMonth = String(now.getMonth() + 1).padStart(2, "0");
@@ -1102,14 +1121,26 @@ function EtiquetasInner() {
               const todayStr = `${localYear}-${localMonth}-${localDay}`;
               const cutoffPassed = now.getHours() >= 13;
 
+              // Demoradas: dispatch_date estrictamente antes de hoy (a las 00:00 ya son demoradas)
+              const delayedShipments = filtered.filter(s => {
+                if (!s.dispatch_date) return false;
+                const d = s.dispatch_date.split("T")[0];
+                return d < todayStr;
+              });
+
+              // Hoy: dispatch_date = hoy (solo antes del corte de las 13:00)
               const todayShipments = filtered.filter(s => {
                 if (!s.dispatch_date) return !cutoffPassed;
                 const d = s.dispatch_date.split("T")[0];
-                return cutoffPassed ? d < todayStr : d <= todayStr;
+                if (d < todayStr) return false; // son demoradas
+                return cutoffPassed ? false : d === todayStr;
               });
+
+              // Próximos: dispatch_date > hoy, o = hoy después de las 13:00
               const futureShipments = filtered.filter(s => {
                 if (!s.dispatch_date) return cutoffPassed;
                 const d = s.dispatch_date.split("T")[0];
+                if (d < todayStr) return false; // son demoradas
                 return cutoffPassed ? d >= todayStr : d > todayStr;
               });
 
@@ -1131,6 +1162,33 @@ function EtiquetasInner() {
 
               return (
                 <div className="space-y-4">
+                  {/* Demoradas - envios con dispatch_date pasada */}
+                  {delayedShipments.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2 px-1">
+                        <span className="text-xs font-black px-3 py-1 rounded-full animate-pulse"
+                          style={{ background: "#EF4444", color: "#fff" }}>
+                          DEMORADAS
+                        </span>
+                        <span className="text-[10px] font-bold" style={{ color: "#EF4444" }}>
+                          {delayedShipments.length} {delayedShipments.length === 1 ? "envio demorado" : "envios demorados"} - Afecta reputacion
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {delayedShipments.map(shipment => (
+                          <LabelCard
+                            key={shipment.shipment_id}
+                            shipment={shipment}
+                            tabContext={statusTab}
+                            onPrinted={handlePrinted}
+                            isSelected={selectedIds.has(shipment.shipment_id)}
+                            onToggleSelection={toggleSelection}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Envios de Hoy */}
                   {todayShipments.length > 0 && (
                     <div>
