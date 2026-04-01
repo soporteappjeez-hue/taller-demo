@@ -18,7 +18,7 @@ const supabaseAdmin = createClient(
 // Usamos ID numérico alto para no conflijar con IDs reales de MeLi
 const TEST_LABEL_DATA = {
   shipment_id: 99999999,
-  order_id: "TEST-ORDER-999",
+  order_id: 99999999,
   sku: "TEST-SKU-PROTOTIPO",
   buyer_nickname: "USUARIO_TEST",
   quantity: 5,
@@ -65,7 +65,7 @@ function generateTestPDF(): Uint8Array {
   const lineHeight = 12;
   const data = [
     ["SHIPMENT ID:", String(TEST_LABEL_DATA.shipment_id)],
-    ["ORDER ID:", TEST_LABEL_DATA.order_id],
+    ["ORDER ID:", String(TEST_LABEL_DATA.order_id)],
     ["SKU:", TEST_LABEL_DATA.sku],
     ["COMPRADOR:", TEST_LABEL_DATA.buyer_nickname],
     ["CANTIDAD:", `${TEST_LABEL_DATA.quantity} unidades`],
