@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 interface SavePrintBatchPayload {
   shipments: Array<{
@@ -17,6 +17,19 @@ interface SavePrintBatchPayload {
   pdf_base64: string;
   tzOffset: number;
 }
+
+// Server-side Supabase client con SERVICE_ROLE_KEY (permisos completos)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("Missing Supabase credentials");
+}
+
+const supabaseAdmin = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseServiceKey || "placeholder-key"
+);
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,8 +72,8 @@ export async function POST(req: NextRequest) {
       const folderPath = `etiquetas/${year}-${month}-${day}`;
       const filePath = `${folderPath}/${fileName}`;
 
-      // Subir PDF al Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // Usar cliente admin de Supabase (server-side) para upload
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
         .from("meli-labels")
         .upload(filePath, bytes, {
           contentType: "application/pdf",
@@ -75,14 +88,14 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Obtener URL pública del archivo
-      const { data: publicData } = supabase.storage
+      // Obtener URL pública del archivo (usando cliente admin)
+      const { data: publicData } = supabaseAdmin.storage
         .from("meli-labels")
         .getPublicUrl(filePath);
 
       const publicUrl = publicData?.publicUrl || filePath;
 
-      // Preparar registros para insertar en printed_labels
+      // Preparar registros para insertar en printed_labels (también usar admin)
       const recordsToInsert = shipments.map((s) => ({
         shipment_id: s.shipment_id,
         order_id: s.order_id,
@@ -100,8 +113,8 @@ export async function POST(req: NextRequest) {
         synced_at: now.toISOString(),
       }));
 
-      // Insertar registros usando upsert para evitar duplicados
-      const { error: insertError } = await supabase
+      // Insertar registros usando upsert (admin client)
+      const { error: insertError } = await supabaseAdmin
         .from("printed_labels")
         .upsert(recordsToInsert, {
           onConflict: "shipment_id,meli_user_id",
