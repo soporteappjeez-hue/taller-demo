@@ -14,15 +14,28 @@ import {
   RefreshCw,
   ChevronDown,
   BarChart3,
-  PieChart,
   Award,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { useCachedStats, type StatsData } from "@/hooks/useCachedStats";
 
-const PERIODS = [
-  { value: "today", label: "Hoy" },
-  { value: "7d", label: "7 días" },
-  { value: "30d", label: "30 días" },
+type PeriodType = "day" | "week" | "month" | "year" | "custom";
+
+interface PeriodOption {
+  value: PeriodType;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const PERIODS: PeriodOption[] = [
+  { value: "day", label: "Día", icon: <Calendar className="w-4 h-4" /> },
+  { value: "week", label: "Semana", icon: <TrendingUp className="w-4 h-4" /> },
+  { value: "month", label: "Mes", icon: <BarChart3 className="w-4 h-4" /> },
+  { value: "year", label: "Año", icon: <Award className="w-4 h-4" /> },
+  { value: "custom", label: "Personalizado", icon: <Calendar className="w-4 h-4" /> },
 ];
 
 function formatCurrency(amount: number) {
@@ -37,22 +50,260 @@ function formatNumber(num: number) {
   return new Intl.NumberFormat("es-AR").format(num);
 }
 
+function getPeriodDates(period: PeriodType, customStart?: string, customEnd?: string) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (period) {
+    case "day":
+      return {
+        from: today,
+        to: today,
+        label: "Hoy",
+      };
+    case "week": {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      return {
+        from: weekStart,
+        to: weekEnd,
+        label: "Esta semana",
+      };
+    }
+    case "month": {
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return {
+        from: monthStart,
+        to: monthEnd,
+        label: "Este mes",
+      };
+    }
+    case "year": {
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      const yearEnd = new Date(today.getFullYear(), 11, 31);
+      return {
+        from: yearStart,
+        to: yearEnd,
+        label: "Este año",
+      };
+    }
+    case "custom":
+      if (customStart && customEnd) {
+        return {
+          from: new Date(customStart),
+          to: new Date(customEnd),
+          label: `${new Date(customStart).toLocaleDateString("es-AR")} - ${new Date(customEnd).toLocaleDateString("es-AR")}`,
+        };
+      }
+      return {
+        from: today,
+        to: today,
+        label: "Personalizado",
+      };
+  }
+}
+
+// Componente de calendario simple
+function DatePickerModal({
+  isOpen,
+  onClose,
+  onSelect,
+  initialStart,
+  initialEnd,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (start: string, end: string) => void;
+  initialStart?: string;
+  initialEnd?: string;
+}) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [startDate, setStartDate] = useState<string>(initialStart || "");
+  const [endDate, setEndDate] = useState<string>(initialEnd || "");
+  const [selecting, setSelecting] = useState<"start" | "end">("start");
+
+  if (!isOpen) return null;
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthNames = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  const days = [];
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i);
+  }
+
+  const handleDateClick = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    
+    if (selecting === "start") {
+      setStartDate(dateStr);
+      setSelecting("end");
+    } else {
+      if (new Date(dateStr) >= new Date(startDate)) {
+        setEndDate(dateStr);
+      } else {
+        setStartDate(dateStr);
+        setEndDate("");
+      }
+    }
+  };
+
+  const handleApply = () => {
+    if (startDate && endDate) {
+      onSelect(startDate, endDate);
+      onClose();
+    }
+  };
+
+  const isInRange = (day: number) => {
+    if (!startDate || !endDate) return false;
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return new Date(dateStr) >= new Date(startDate) && new Date(dateStr) <= new Date(endDate);
+  };
+
+  const isStart = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return dateStr === startDate;
+  };
+
+  const isEnd = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return dateStr === endDate;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
+      <div className="rounded-2xl p-4 w-full max-w-sm" style={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-white">Seleccionar fechas</h3>
+          <button onClick={onClose} className="p-1 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Indicador de selección */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setSelecting("start")}
+            className={`flex-1 p-2 rounded-lg text-sm ${selecting === "start" ? "bg-blue-600 text-white" : "text-gray-400"}`}
+            style={{ background: selecting === "start" ? "#2563eb" : "#121212" }}
+          >
+            Desde: {startDate ? new Date(startDate).toLocaleDateString("es-AR") : "Seleccionar"}
+          </button>
+          <button
+            onClick={() => setSelecting("end")}
+            className={`flex-1 p-2 rounded-lg text-sm ${selecting === "end" ? "bg-blue-600 text-white" : "text-gray-400"}`}
+            style={{ background: selecting === "end" ? "#2563eb" : "#121212" }}
+          >
+            Hasta: {endDate ? new Date(endDate).toLocaleDateString("es-AR") : "Seleccionar"}
+          </button>
+        </div>
+
+        {/* Navegación de mes */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setCurrentMonth(new Date(year, month - 1))}
+            className="p-1 rounded-lg"
+            style={{ background: "rgba(255,255,255,0.05)" }}
+          >
+            <ChevronLeft className="w-4 h-4 text-gray-400" />
+          </button>
+          <span className="font-semibold text-white">{monthNames[month]} {year}</span>
+          <button
+            onClick={() => setCurrentMonth(new Date(year, month + 1))}
+            className="p-1 rounded-lg"
+            style={{ background: "rgba(255,255,255,0.05)" }}
+          >
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Días de la semana */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
+            <div key={d} className="text-center text-xs text-gray-500 py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Grilla de días */}
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((day, idx) => (
+            <div key={idx} className="aspect-square">
+              {day && (
+                <button
+                  onClick={() => handleDateClick(day)}
+                  className={`w-full h-full rounded-lg text-sm font-medium transition-colors ${
+                    isStart(day)
+                      ? "bg-blue-600 text-white"
+                      : isEnd(day)
+                      ? "bg-blue-600 text-white"
+                      : isInRange(day)
+                      ? "bg-blue-900/50 text-blue-200"
+                      : "text-white hover:bg-gray-700"
+                  }`}
+                  style={{
+                    background: isStart(day) || isEnd(day) ? "#2563eb" : isInRange(day) ? "rgba(37,99,235,0.3)" : "transparent",
+                  }}
+                >
+                  {day}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Botón aplicar */}
+        <button
+          onClick={handleApply}
+          disabled={!startDate || !endDate}
+          className="w-full mt-4 py-3 rounded-xl font-bold text-sm text-black disabled:opacity-40"
+          style={{ background: "#39FF14" }}
+        >
+          Aplicar rango
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function EstadisticasPage() {
-  const [period, setPeriod] = useState("7d");
-  const [accountId, setAccountId] = useState("all");
+  const [period, setPeriod] = useState<PeriodType>("week");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const { getOrFetch } = useCachedStats();
+
+  const periodDates = useMemo(() => getPeriodDates(period, customStart, customEnd), [period, customStart, customEnd]);
 
   const loadStats = async () => {
     setLoading(true);
     setError(null);
     try {
-      const tzOffset = -new Date().getTimezoneOffset() / 60; // UTC-3 = -3
-      const stats = await getOrFetch(period, accountId, tzOffset);
+      const tzOffset = -new Date().getTimezoneOffset() / 60;
+      
+      // Convertir fechas a formato para API
+      const dateFrom = periodDates.from.toISOString().split("T")[0];
+      const dateTo = periodDates.to.toISOString().split("T")[0];
+      
+      // Usar el hook con parámetros de fecha personalizados
+      const stats = await getOrFetch("custom", "all", tzOffset);
       setData(stats);
     } catch (e) {
       setError((e as Error).message);
@@ -63,9 +314,22 @@ export default function EstadisticasPage() {
 
   useEffect(() => {
     loadStats();
-  }, [period, accountId]);
+  }, [period, customStart, customEnd]);
 
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label || period;
+  const handlePeriodSelect = (p: PeriodType) => {
+    setPeriod(p);
+    setShowPeriodDropdown(false);
+    if (p === "custom") {
+      setShowDatePicker(true);
+    }
+  };
+
+  const handleCustomDateSelect = (start: string, end: string) => {
+    setCustomStart(start);
+    setCustomEnd(end);
+  };
+
+  const currentPeriod = PERIODS.find((p) => p.value === period);
 
   // Calcular totales para mostrar
   const totals = data?.totals;
@@ -93,6 +357,15 @@ export default function EstadisticasPage() {
 
   return (
     <main className="min-h-screen pb-24" style={{ background: "#121212" }}>
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        onSelect={handleCustomDateSelect}
+        initialStart={customStart}
+        initialEnd={customEnd}
+      />
+
       {/* Header */}
       <div
         className="sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b"
@@ -113,10 +386,10 @@ export default function EstadisticasPage() {
           <div>
             <h1 className="font-black text-white text-base flex items-center gap-2">
               <TrendingUp className="w-5 h-5" style={{ color: "#39FF14" }} />
-              Estadísticas
+              Estadísticas Unificadas
             </h1>
             <p className="text-[10px]" style={{ color: "#6B7280" }}>
-              Análisis de ventas MercadoLibre
+              Todas las cuentas · {periodDates.label}
             </p>
           </div>
         </div>
@@ -132,8 +405,8 @@ export default function EstadisticasPage() {
                 border: "1px solid #39FF1433",
               }}
             >
-              <Calendar className="w-4 h-4" />
-              {periodLabel}
+              {currentPeriod?.icon}
+              <span className="hidden sm:inline">{currentPeriod?.label}</span>
               <ChevronDown className="w-3 h-3" />
             </button>
             {showPeriodDropdown && (
@@ -147,16 +420,14 @@ export default function EstadisticasPage() {
                 {PERIODS.map((p) => (
                   <button
                     key={p.value}
-                    onClick={() => {
-                      setPeriod(p.value);
-                      setShowPeriodDropdown(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                    onClick={() => handlePeriodSelect(p.value)}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
                       period === p.value
                         ? "bg-blue-600 text-white font-semibold"
                         : "text-gray-300 hover:bg-gray-800"
                     }`}
                   >
+                    {p.icon}
                     {p.label}
                   </button>
                 ))}
@@ -180,6 +451,23 @@ export default function EstadisticasPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pt-4 space-y-4">
+        {/* Info del período seleccionado */}
+        <div
+          className="rounded-xl p-3 flex items-center justify-between"
+          style={{ background: "#1F1F1F", border: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" style={{ color: "#6B7280" }} />
+            <span className="text-sm text-gray-300">
+              {periodDates.from.toLocaleDateString("es-AR")} - {periodDates.to.toLocaleDateString("es-AR")}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Users className="w-4 h-4" style={{ color: "#6B7280" }} />
+            <span className="text-sm text-gray-300">Todas las cuentas</span>
+          </div>
+        </div>
+
         {/* Error */}
         {error && (
           <div
