@@ -4,7 +4,24 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 300;
 
-type AdjustmentType = "percentage" | "fixed_floor" | "fixed_add";
+type AdjustmentType = "percentage" | "fixed_floor" | "fixed_add" | "stock_set" | "stock_add" | "stock_subtract";
+
+function isStockMode(type: AdjustmentType): boolean {
+  return type.startsWith("stock_");
+}
+
+function computeNewStock(current: number, type: AdjustmentType, value: number): number {
+  switch (type) {
+    case "stock_set":      return value;
+    case "stock_add":      return current + value;
+    case "stock_subtract": return Math.max(0, current - value);
+    default:               return current;
+  }
+}
+
+function shouldUpdateStock(current: number, newVal: number): boolean {
+  return current !== newVal;
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function normalize(s: string): string {
@@ -109,10 +126,10 @@ async function getMatchingIds(userId: string, token: string, keyword: string, si
 }
 
 interface ItemDetail {
-  id: string; title: string; price: number;
+  id: string; title: string; price: number; available_quantity: number;
   catalog_listing?: boolean; catalog_product_id?: string;
   deal_ids?: string[];
-  variations?: Array<{ id: number; price: number; [k: string]: unknown }>;
+  variations?: Array<{ id: number; price: number; available_quantity?: number; [k: string]: unknown }>;
 }
 
 /* ── SSE helper ──────────────────────────────────────────────────── */
@@ -216,7 +233,7 @@ export async function POST(req: Request) {
 
           const chunk = idsToCheck.slice(i, i + 20);
           const data = await meliGetWithRetry(
-            `/items?ids=${chunk.join(",")}&attributes=id,title,price,catalog_listing,catalog_product_id,deal_ids,variations`,
+            `/items?ids=${chunk.join(",")}&attributes=id,title,price,available_quantity,catalog_listing,catalog_product_id,deal_ids,variations`,
             token, signal
           );
           if (!data) { await new Promise(r => setTimeout(r, 500)); continue; }
@@ -251,51 +268,71 @@ export async function POST(req: Request) {
 
             const isCatalog = !!(item.catalog_listing || item.catalog_product_id);
             const hasPromo  = Array.isArray(item.deal_ids) && item.deal_ids.length > 0;
+            const stockMode = isStockMode(adjustment_type);
 
-            // Calcular nuevo precio (soporta variaciones)
-            const baseNew = computeNewPrice(item.price, adjustment_type, adjustment_value);
-            const needsBase = shouldUpdate(item.price, baseNew, adjustment_type);
-
-            if (item.variations?.length) {
-              const updatedVars = item.variations.map(v => ({
-                ...v, price: computeNewPrice(v.price, adjustment_type, adjustment_value),
-              }));
-              const varsToUpdate = updatedVars.filter((v, idx) =>
-                shouldUpdate(item.variations![idx].price, v.price, adjustment_type)
-              );
-
-              if (!needsBase && varsToUpdate.length === 0) {
-                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
+            if (stockMode) {
+              // ── MODO STOCK ──
+              const oldStock = item.available_quantity ?? 0;
+              const newStock = computeNewStock(oldStock, adjustment_type, adjustment_value);
+              if (!shouldUpdateStock(oldStock, newStock)) {
+                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname, old_stock: oldStock, new_stock: oldStock });
+                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: oldStock, new_price: oldStock, status: "skipped", reason: "Stock ya cumple la condición" });
                 continue;
               }
-
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
-
+              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_stock: oldStock, new_stock: newStock, account: acc.nickname });
               if (!dry_run) {
-                const putBody: Record<string, unknown> = { variations: updatedVars.map(v => ({ id: v.id, price: v.price })) };
-                if (needsBase) putBody.price = baseNew;
-                const putRes = await meliPut(`/items/${item.id}`, token, putBody, signal);
-                const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message, variations_updated: varsToUpdate.length });
+                const putRes = await meliPut(`/items/${item.id}`, token, { available_quantity: newStock }, signal);
+                const status = putRes.ok ? "updated" : "error";
+                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: oldStock, new_price: newStock, status, reason: putRes.ok ? undefined : (putRes.data as Record<string,unknown>)?.message });
               } else {
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated", variations_updated: varsToUpdate.length });
+                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: oldStock, new_price: newStock, status: "updated" });
               }
             } else {
-              if (!needsBase) {
-                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
-                continue;
-              }
+              // ── MODO PRECIO (lógica original intacta) ──
+              const baseNew = computeNewPrice(item.price, adjustment_type, adjustment_value);
+              const needsBase = shouldUpdate(item.price, baseNew, adjustment_type);
 
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
+              if (item.variations?.length) {
+                const updatedVars = item.variations.map(v => ({
+                  ...v, price: computeNewPrice(v.price, adjustment_type, adjustment_value),
+                }));
+                const varsToUpdate = updatedVars.filter((v, idx) =>
+                  shouldUpdate(item.variations![idx].price, v.price, adjustment_type)
+                );
 
-              if (!dry_run) {
-                const putRes = await meliPut(`/items/${item.id}`, token, { price: baseNew }, signal);
-                const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message });
+                if (!needsBase && varsToUpdate.length === 0) {
+                  await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
+                  continue;
+                }
+
+                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
+
+                if (!dry_run) {
+                  const putBody: Record<string, unknown> = { variations: updatedVars.map(v => ({ id: v.id, price: v.price })) };
+                  if (needsBase) putBody.price = baseNew;
+                  const putRes = await meliPut(`/items/${item.id}`, token, putBody, signal);
+                  const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message, variations_updated: varsToUpdate.length });
+                } else {
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated", variations_updated: varsToUpdate.length });
+                }
               } else {
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated" });
+                if (!needsBase) {
+                  await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
+                  continue;
+                }
+
+                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
+
+                if (!dry_run) {
+                  const putRes = await meliPut(`/items/${item.id}`, token, { price: baseNew }, signal);
+                  const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message });
+                } else {
+                  results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated" });
+                }
               }
             }
 

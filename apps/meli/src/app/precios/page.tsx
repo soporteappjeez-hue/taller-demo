@@ -4,10 +4,11 @@ import Link from "next/link";
 import {
   ArrowLeft, Search, DollarSign, RefreshCw, AlertTriangle,
   XCircle, Tag, ShieldAlert, Eye, Percent, Plus, TrendingUp,
-  Square, Play, Ban,
+  Square, Play, Ban, Package, Minus, Hash,
 } from "lucide-react";
 
-type AdjustmentType = "percentage" | "fixed_floor" | "fixed_add";
+type AdjustmentType = "percentage" | "fixed_floor" | "fixed_add" | "stock_set" | "stock_add" | "stock_subtract";
+type Mode = "price" | "stock";
 
 interface PriceResult {
   account: string;
@@ -61,7 +62,20 @@ const ADJ_TYPES: Array<{
     icon: <Plus className="w-4 h-4" />,      color: "#00E5FF", placeholder: "500",   prefix: "$+" },
 ];
 
+const STOCK_TYPES: Array<{
+  value: AdjustmentType; label: string; desc: string;
+  icon: React.ReactNode; color: string; placeholder: string; prefix: string;
+}> = [
+  { value: "stock_set",      label: "Fijar Stock",     desc: "Pone un valor fijo de unidades",
+    icon: <Hash className="w-4 h-4" />,    color: "#39FF14", placeholder: "50",  prefix: "=" },
+  { value: "stock_add",      label: "Sumar",           desc: "Agrega N unidades al actual",
+    icon: <Plus className="w-4 h-4" />,    color: "#00E5FF", placeholder: "10",  prefix: "+" },
+  { value: "stock_subtract", label: "Restar",          desc: "Resta N unidades (mín. 0)",
+    icon: <Minus className="w-4 h-4" />,   color: "#F97316", placeholder: "5",   prefix: "-" },
+];
+
 function PreciosInner() {
+  const [mode, setMode]                 = useState<Mode>("price");
   const [keyword, setKeyword]           = useState("");
   const [excludeWords, setExcludeWords] = useState("");
   const [adjType, setAdjType]           = useState<AdjustmentType>("fixed_floor");
@@ -89,11 +103,17 @@ function PreciosInner() {
       .catch(() => {});
   }, []);
 
-  const activeCfg = ADJ_TYPES.find(t => t.value === adjType)!;
+  const currentTypes = mode === "price" ? ADJ_TYPES : STOCK_TYPES;
+  const activeCfg = currentTypes.find(t => t.value === adjType) ?? currentTypes[0];
 
   const previewFormula = () => {
     const v = Number(adjValue);
     if (!v) return null;
+    if (mode === "stock") {
+      const sample = 10;
+      const r = adjType === "stock_set" ? v : adjType === "stock_add" ? sample + v : Math.max(0, sample - v);
+      return `Ej: Stock ${sample} → ${r} unidades`;
+    }
     const sample = 10000;
     const r = adjType === "percentage" ? sample * (1 + v / 100) : adjType === "fixed_add" ? sample + v : v;
     return `Ej: $${sample.toLocaleString("es-AR")} → $${Math.round(r).toLocaleString("es-AR")}`;
@@ -182,14 +202,40 @@ function PreciosInner() {
       {/* Header */}
       <div className="sticky top-0 z-30 px-4 py-3 flex items-center gap-3 border-b"
         style={{ background: "rgba(18,18,18,0.97)", backdropFilter: "blur(16px)", borderColor: "rgba(255,255,255,0.07)" }}>
-        <Link href="/appjeez" className="p-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
+        <Link href="/" className="p-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.05)" }}>
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="font-black text-white text-base flex items-center gap-2">
-            <DollarSign className="w-5 h-5" style={{ color: "#39FF14" }} /> Actualizar Precios
+            {mode === "price"
+              ? <><DollarSign className="w-5 h-5" style={{ color: "#39FF14" }} /> Actualizar Precios</>
+              : <><Package className="w-5 h-5" style={{ color: "#00E5FF" }} /> Actualizar Stock</>}
           </h1>
-          <p className="text-[10px]" style={{ color: "#6B7280" }}>Ajuste masivo por palabra clave</p>
+          <p className="text-[10px]" style={{ color: "#6B7280" }}>
+            {mode === "price" ? "Ajuste masivo por palabra clave" : "Gestión masiva de stock por palabra clave"}
+          </p>
+        </div>
+      </div>
+
+      {/* Toggle Precio / Stock */}
+      <div className="max-w-2xl mx-auto px-4 pt-4">
+        <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+          <button
+            onClick={() => { setMode("price"); setAdjType("fixed_floor"); setAdjValue(""); }}
+            className="flex-1 py-2.5 text-xs font-black flex items-center justify-center gap-2 transition-all"
+            style={mode === "price"
+              ? { background: "#39FF1420", color: "#39FF14" }
+              : { background: "#1F1F1F", color: "#6B7280" }}>
+            <DollarSign className="w-4 h-4" /> Precios
+          </button>
+          <button
+            onClick={() => { setMode("stock"); setAdjType("stock_set"); setAdjValue(""); }}
+            className="flex-1 py-2.5 text-xs font-black flex items-center justify-center gap-2 transition-all"
+            style={mode === "stock"
+              ? { background: "#00E5FF20", color: "#00E5FF" }
+              : { background: "#1F1F1F", color: "#6B7280" }}>
+            <Package className="w-4 h-4" /> Stock
+          </button>
         </div>
       </div>
 
@@ -245,7 +291,7 @@ function PreciosInner() {
           <div>
             <label className="text-xs font-bold text-gray-400 mb-2 block">Tipo de ajuste</label>
             <div className="grid grid-cols-3 gap-2">
-              {ADJ_TYPES.map(t => (
+              {currentTypes.map(t => (
                 <button key={t.value} onClick={() => setAdjType(t.value)}
                   className="p-3 rounded-xl text-center transition-all border"
                   style={adjType === t.value
@@ -381,7 +427,9 @@ function PreciosInner() {
                 <p className="text-xs text-white line-clamp-1">{progress.title}</p>
                 {progress.old_price != null && progress.new_price != null && (
                   <p className="text-[10px] mt-0.5 font-bold" style={{ color: activeCfg.color }}>
-                    ${progress.old_price.toLocaleString("es-AR")} → ${progress.new_price.toLocaleString("es-AR")}
+                    {mode === "stock"
+                      ? `${progress.old_price} → ${progress.new_price} uds`
+                      : `$${progress.old_price.toLocaleString("es-AR")} → $${progress.new_price.toLocaleString("es-AR")}`}
                   </p>
                 )}
               </div>
@@ -446,16 +494,18 @@ function PreciosInner() {
                       </div>
                       <p className="text-xs text-white line-clamp-1">{r.title}</p>
                       <div className="flex items-center gap-2 text-xs">
-                        <span style={{ color: "#6B7280" }}>${r.old_price.toLocaleString("es-AR")}</span>
+                        <span style={{ color: "#6B7280" }}>
+                          {mode === "stock" ? `${r.old_price} uds` : `$${r.old_price.toLocaleString("es-AR")}`}
+                        </span>
                         {r.status !== "skipped" && r.status !== "excluded" && (
                           <>
                             <span style={{ color: "#6B7280" }}>→</span>
                             <span className="font-black" style={{ color: "#39FF14" }}>
-                              ${r.new_price.toLocaleString("es-AR")}
+                              {mode === "stock" ? `${r.new_price} uds` : `$${r.new_price.toLocaleString("es-AR")}`}
                             </span>
                             {diff !== 0 && (
                               <span className="text-[10px] font-bold" style={{ color: diff > 0 ? "#39FF14" : "#ef4444" }}>
-                                ({diff > 0 ? "+" : ""}{diff.toLocaleString("es-AR")})
+                                ({diff > 0 ? "+" : ""}{mode === "stock" ? diff : diff.toLocaleString("es-AR")})
                               </span>
                             )}
                           </>
