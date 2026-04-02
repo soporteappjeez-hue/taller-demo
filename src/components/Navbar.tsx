@@ -29,7 +29,6 @@ export default function Navbar({
     { href: "/ventas",       label: "Vender",       icon: ShoppingCart,    badge: 0,             badgeColor: "" },
     { href: "/estadisticas", label: "Estadísticas", icon: BarChart2,       badge: 0,             badgeColor: "" },
     { href: "/agenda",       label: "Agenda",       icon: Users,           badge: 0,             badgeColor: "" },
-    { href: "/flex",         label: "Flex",         icon: Truck,           badge: 0,             badgeColor: "" },
   ];
 
   return (

@@ -504,7 +504,7 @@ export default function VentasPage() {
       {/* ── Tabs ── */}
       <div className="sticky top-14 z-30 border-b border-white/10"
         style={{ background: "rgba(18,18,18,0.95)", backdropFilter: "blur(12px)" }}>
-        <div className="max-w-3xl mx-auto px-4 flex">
+        <div className="max-w-3xl mx-auto px-4 flex justify-center gap-2">
           {([
             { id: "nueva",         label: "Nueva Venta",   icon: ShoppingCart },
             { id: "movimientos",   label: "Movimientos",   icon: List },
