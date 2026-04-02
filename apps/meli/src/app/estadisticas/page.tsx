@@ -334,6 +334,84 @@ export default function EstadisticasPage() {
   // Calcular totales para mostrar
   const totals = data?.totals;
 
+  // Procesar datos de ventas según el período seleccionado
+  const chartData = useMemo(() => {
+    if (!data?.sales_by_day) return [];
+    
+    const sales = data.sales_by_day;
+    
+    switch (period) {
+      case "year": {
+        // Agrupar por mes
+        const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        const byMonth = new Map<number, { label: string; amount: number; orders: number }>();
+        
+        sales.forEach((day) => {
+          const date = new Date(day.date);
+          const month = date.getMonth();
+          const existing = byMonth.get(month) || { label: months[month], amount: 0, orders: 0 };
+          existing.amount += day.amount;
+          existing.orders += day.orders;
+          byMonth.set(month, existing);
+        });
+        
+        return Array.from(byMonth.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([_, data]) => data);
+      }
+      
+      case "month": {
+        // Agrupar por día del mes (1-31)
+        const byDay = new Map<number, { label: string; amount: number; orders: number }>();
+        
+        sales.forEach((day) => {
+          const date = new Date(day.date);
+          const dayNum = date.getDate();
+          const existing = byDay.get(dayNum) || { label: `${dayNum}`, amount: 0, orders: 0 };
+          existing.amount += day.amount;
+          existing.orders += day.orders;
+          byDay.set(dayNum, existing);
+        });
+        
+        // Llenar días vacíos
+        const daysInMonth = new Date(periodDates.to.getFullYear(), periodDates.to.getMonth() + 1, 0).getDate();
+        for (let i = 1; i <= daysInMonth; i++) {
+          if (!byDay.has(i)) {
+            byDay.set(i, { label: `${i}`, amount: 0, orders: 0 });
+          }
+        }
+        
+        return Array.from(byDay.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([_, data]) => data);
+      }
+      
+      case "week":
+      case "day":
+      case "custom":
+      default: {
+        // Mostrar por día
+        return sales.map((day) => ({
+          label: new Date(day.date).toLocaleDateString("es-AR", {
+            day: "2-digit",
+            month: "2-digit",
+          }),
+          amount: day.amount,
+          orders: day.orders,
+        }));
+      }
+    }
+  }, [data?.sales_by_day, period, periodDates]);
+
+  // Título del gráfico según período
+  const chartTitle = useMemo(() => {
+    switch (period) {
+      case "year": return "Ventas por mes";
+      case "month": return "Ventas por día";
+      default: return "Ventas por día";
+    }
+  }, [period]);
+
   // Datos para gráfico de envíos
   const shippingData = useMemo(() => {
     if (!data?.shipping_breakdown) return [];
@@ -614,8 +692,8 @@ export default function EstadisticasPage() {
               </div>
             </div>
 
-            {/* Gráfico de ventas por día */}
-            {data.sales_by_day.length > 0 && (
+            {/* Gráfico de ventas */}
+            {chartData.length > 0 && (
               <div
                 className="rounded-2xl p-4"
                 style={{
@@ -625,21 +703,16 @@ export default function EstadisticasPage() {
               >
                 <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" style={{ color: "#39FF14" }} />
-                  Ventas por día
+                  {chartTitle}
                 </h3>
                 <div className="space-y-2">
-                  {data.sales_by_day.map((day) => {
-                    const maxAmount = Math.max(
-                      ...data.sales_by_day.map((d) => d.amount)
-                    );
-                    const percentage = maxAmount > 0 ? (day.amount / maxAmount) * 100 : 0;
+                  {chartData.map((item, idx) => {
+                    const maxAmount = Math.max(...chartData.map((d) => d.amount));
+                    const percentage = maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0;
                     return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <span className="text-xs w-16" style={{ color: "#6B7280" }}>
-                          {new Date(day.date).toLocaleDateString("es-AR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
+                      <div key={idx} className="flex items-center gap-3">
+                        <span className="text-xs w-12 text-right" style={{ color: "#6B7280" }}>
+                          {item.label}
                         </span>
                         <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ background: "#121212" }}>
                           <div
@@ -651,7 +724,7 @@ export default function EstadisticasPage() {
                           />
                         </div>
                         <span className="text-xs font-semibold text-white w-20 text-right">
-                          {formatCurrency(day.amount)}
+                          {formatCurrency(item.amount)}
                         </span>
                       </div>
                     );
