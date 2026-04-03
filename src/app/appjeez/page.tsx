@@ -3,15 +3,18 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   MessageCircle, MessageSquare, Truck, Tag, TrendingUp,
   Star, AlertTriangle, CheckCircle2, RefreshCw, Settings,
   ChevronDown, ChevronUp, ShoppingCart, DollarSign,
   Package, Clock, XCircle, BarChart2, ExternalLink,
   Bell, Store, Menu, X, Copy, Pencil, Check, Zap,
+  LogOut, User, Mail, Lock, Eye, EyeOff
 } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
+import { supabase } from "@/lib/supabase";
 import AccountSelector from "@/components/AccountSelector";
 import AccountDetailsPanel from "@/components/AccountDetailsPanel";
 import UnifiedPostSalePanel from "@/components/UnifiedPostSalePanel";
@@ -349,6 +352,7 @@ function AccountPanel({ data, defaultOpen, editingNick, editNickVal, setEditingN
 
 function AppJeezInner() {
   const params    = useSearchParams();
+  const router    = useRouter();
   const connected = params.get("connected") === "true";
 
   const [accounts, setAccounts] = useState<AccountDash[]>([]);
@@ -360,6 +364,10 @@ function AppJeezInner() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [editingNick, setEditingNick] = useState<string | null>(null);
   const [editNickVal, setEditNickVal] = useState("");
+  
+  // User auth state
+  const [user, setUser] = useState<any>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -398,6 +406,21 @@ function AppJeezInner() {
       localStorage.setItem("selectedAccountId", selectedAccountId);
     }
   }, [selectedAccountId]);
+
+  // Obtener usuario actual
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
+
+  // Función de logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+  };
 
   // ⚠️ Polling automático DESACTIVADO - Usando SSE/Webhooks en su lugar
   const { isRefreshing, manualRefresh } = useAutoRefresh(
@@ -644,6 +667,58 @@ function AppJeezInner() {
               <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">{loading || isRefreshing ? "Actualizando..." : "Actualizar"}</span>
             </button>
+
+            {/* User Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 transition"
+                style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+              >
+                <div className="w-7 h-7 rounded-full bg-[#FFE600] flex items-center justify-center">
+                  <User className="w-4 h-4 text-[#003087]" />
+                </div>
+                <span className="hidden sm:inline text-gray-300 max-w-[120px] truncate">
+                  {user?.email || "Usuario"}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition ${userMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {userMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setUserMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-[#1F1F1F] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-4 border-b border-white/10">
+                      <p className="text-sm font-semibold text-white truncate">{user?.email || "Usuario"}</p>
+                      <p className="text-xs text-gray-500">{user?.user_metadata?.full_name || "Cuenta de MaqJeez"}</p>
+                    </div>
+                    
+                    <Link
+                      href="/perfil"
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 transition"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Settings className="w-4 h-4" />
+                      Configurar Perfil
+                    </Link>
+                    
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar Sesión
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
