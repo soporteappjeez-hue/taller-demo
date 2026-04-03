@@ -9,9 +9,19 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  cuit: string;
+  arca_position: string;
+}
+
 export default function UsuarioConfigPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -34,19 +44,50 @@ export default function UsuarioConfigPage() {
   const [arcaPosition, setArcaPosition] = useState("");
   const [cuit, setCuit] = useState("");
 
+  // Cargar datos del usuario y perfil
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const loadData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
         router.push("/login");
         return;
       }
+      
       setUser(session.user);
-      setFullName(session.user.user_metadata?.full_name || "");
-      setPhone(session.user.user_metadata?.phone || "");
-      setArcaPosition(session.user.user_metadata?.arca_position || "");
-      setCuit(session.user.user_metadata?.cuit || "");
+
+      // Cargar perfil desde la tabla profiles
+      const { data: profileData, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+
+      if (profileData) {
+        setProfile(profileData);
+        setFullName(profileData.full_name || "");
+        setPhone(profileData.phone || "");
+        setArcaPosition(profileData.arca_position || "");
+        setCuit(profileData.cuit || "");
+      } else {
+        // Si no existe el perfil, usar metadatos del usuario
+        setFullName(session.user.user_metadata?.full_name || "");
+        setPhone(session.user.user_metadata?.phone || "");
+        setArcaPosition(session.user.user_metadata?.arca_position || "");
+        setCuit(session.user.user_metadata?.cuit || "");
+        
+        // Crear perfil si no existe
+        await supabase.from("profiles").upsert({
+          id: session.user.id,
+          email: session.user.email,
+          full_name: session.user.user_metadata?.full_name || "",
+        });
+      }
+      
       setLoading(false);
-    });
+    };
+
+    loadData();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
@@ -62,7 +103,22 @@ export default function UsuarioConfigPage() {
     setMessage(null);
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      // Guardar en la tabla profiles
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          email: user.email,
+          full_name: fullName,
+          phone: phone,
+          arca_position: arcaPosition,
+          cuit: cuit,
+        });
+
+      if (profileError) throw profileError;
+
+      // También actualizar metadatos del usuario
+      await supabase.auth.updateUser({
         data: {
           full_name: fullName,
           phone: phone,
@@ -71,7 +127,6 @@ export default function UsuarioConfigPage() {
         }
       });
 
-      if (error) throw error;
       setMessage({ type: "success", text: "Datos actualizados correctamente" });
     } catch (error: any) {
       setMessage({ type: "error", text: error.message || "Error al actualizar datos" });
@@ -90,7 +145,7 @@ export default function UsuarioConfigPage() {
     setMessage(null);
 
     try {
-      // Primero verificar la contraseña actual
+      // Verificar la contraseña actual
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: emailPassword,
@@ -102,6 +157,13 @@ export default function UsuarioConfigPage() {
       const { error } = await supabase.auth.updateUser({ email: newEmail });
 
       if (error) throw error;
+      
+      // Actualizar en la tabla profiles
+      await supabase
+        .from("profiles")
+        .update({ email: newEmail })
+        .eq("id", user.id);
+
       setMessage({ type: "success", text: "Se envió un email de confirmación a " + newEmail });
       setNewEmail("");
       setEmailPassword("");
@@ -293,19 +355,19 @@ export default function UsuarioConfigPage() {
           </h2>
 
           <div className="space-y-4">
-            <div className="relative">
+            <div>
               <label className="text-xs text-gray-400 mb-1 block">Contraseña actual</label>
               <input
                 type={showPasswords ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl text-white pr-10"
+                className="w-full px-4 py-2.5 rounded-xl text-white"
                 style={{ background: "#121212", border: "1px solid rgba(255,255,255,0.1)" }}
                 placeholder="••••••••"
               />
             </div>
 
-            <div className="relative">
+            <div>
               <label className="text-xs text-gray-400 mb-1 block">Nueva contraseña</label>
               <input
                 type={showPasswords ? "text" : "password"}
@@ -317,7 +379,7 @@ export default function UsuarioConfigPage() {
               />
             </div>
 
-            <div className="relative">
+            <div>
               <label className="text-xs text-gray-400 mb-1 block">Confirmar nueva contraseña</label>
               <input
                 type={showPasswords ? "text" : "password"}
