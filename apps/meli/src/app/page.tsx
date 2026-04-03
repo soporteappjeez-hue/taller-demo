@@ -557,28 +557,6 @@ function AppJeezInner() {
             </Link>
           ))}
         </nav>
-
-        {/* User Section with Logout */}
-        <div className="p-3 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
-            <div className="w-8 h-8 rounded-full bg-[#FFE600] flex items-center justify-center flex-shrink-0">
-              <User className="w-4 h-4 text-[#003087]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user?.email || "Usuario"}</p>
-              <p className="text-[10px] text-gray-500">MaqJeez</p>
-            </div>
-          </div>
-          
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition mt-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar Sesión
-          </button>
-        </div>
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -603,31 +581,6 @@ function AppJeezInner() {
                 </Link>
               ))}
             </nav>
-            
-            {/* User Section Mobile */}
-            <div className="p-4 border-t border-white/10">
-              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
-                <div className="w-8 h-8 rounded-full bg-[#FFE600] flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-[#003087]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{user?.email || "Usuario"}</p>
-                  <p className="text-[10px] text-gray-500">MaqJeez</p>
-                </div>
-              </div>
-              
-              {/* Logout Button Mobile */}
-              <button
-                onClick={() => {
-                  setSidebarOpen(false);
-                  handleLogout();
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition mt-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Cerrar Sesión
-              </button>
-            </div>
           </aside>
         </div>
       )}
@@ -695,7 +648,7 @@ function AppJeezInner() {
               <span className="hidden sm:inline">{loading || isRefreshing ? "Actualizando..." : "Actualizar"}</span>
             </button>
 
-            {/* User Info + Logout Button */}
+            {/* User Info + Config + Logout */}
             <div className="flex items-center gap-2">
               {/* User Email Badge */}
               <div 
@@ -710,7 +663,21 @@ function AppJeezInner() {
                 </span>
               </div>
 
-              {/* Logout Button - PROMINENT */}
+              {/* Config Button */}
+              <Link
+                href="/configuracion/usuario"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+                style={{ 
+                  background: "rgba(255,255,255,0.1)", 
+                  color: "#fff", 
+                  border: "1px solid rgba(255,255,255,0.2)" 
+                }}
+                title="Configuración"
+              >
+                <Settings className="w-4 h-4" />
+              </Link>
+
+              {/* Logout Button */}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
