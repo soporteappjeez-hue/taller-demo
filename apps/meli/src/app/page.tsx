@@ -3,15 +3,18 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   MessageCircle, MessageSquare, Truck, Tag, TrendingUp,
   Star, AlertTriangle, CheckCircle2, RefreshCw, Settings,
   ChevronDown, ChevronUp, ShoppingCart, DollarSign,
   Package, Clock, XCircle, BarChart2, ExternalLink,
   Bell, Store, Menu, X, Copy, Pencil, Check, Zap,
+  LogOut, User, Home
 } from "lucide-react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
+import { supabase } from "@/lib/supabase";
 import AccountSelector from "@/components/AccountSelector";
 import AccountDetailsPanel from "@/components/AccountDetailsPanel";
 import UnifiedPostSalePanel from "@/components/UnifiedPostSalePanel";
@@ -350,6 +353,7 @@ function AccountPanel({ data, defaultOpen, editingNick, editNickVal, setEditingN
 function AppJeezInner() {
   const params    = useSearchParams();
   const connected = params.get("connected") === "true";
+  const router    = useRouter();
 
   const [accounts, setAccounts] = useState<AccountDash[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -360,6 +364,25 @@ function AppJeezInner() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [editingNick, setEditingNick] = useState<string | null>(null);
   const [editNickVal, setEditNickVal] = useState("");
+  const [user, setUser] = useState<any>(null);
+
+  // Obtener usuario actual
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Función de logout
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    router.push("/login");
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -535,14 +558,26 @@ function AppJeezInner() {
           ))}
         </nav>
 
-        <div className="px-4 pb-4">
-          <Link
-            href="/"
-            className="flex items-center justify-center gap-2 text-sm font-bold px-3 py-2.5 rounded-xl w-full transition-opacity hover:opacity-80"
-            style={{ background: "#FFE60018", color: "#FFE600", border: "1px solid #FFE60033" }}
+        {/* User Section with Logout */}
+        <div className="p-3 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+            <div className="w-8 h-8 rounded-full bg-[#FFE600] flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4 text-[#003087]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white truncate">{user?.email || "Usuario"}</p>
+              <p className="text-[10px] text-gray-500">MaqJeez</p>
+            </div>
+          </div>
+          
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition mt-2"
           >
-            🏠 Inicio Maqjeez
-          </Link>
+            <LogOut className="w-4 h-4" />
+            Cerrar Sesión
+          </button>
         </div>
       </aside>
 
@@ -568,15 +603,30 @@ function AppJeezInner() {
                 </Link>
               ))}
             </nav>
-            <div className="px-4 pb-5">
-              <Link
-                href="/"
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center justify-center gap-2 text-sm font-bold px-3 py-2.5 rounded-xl w-full"
-                style={{ background: "#FFE60018", color: "#FFE600", border: "1px solid #FFE60033" }}
+            
+            {/* User Section Mobile */}
+            <div className="p-4 border-t border-white/10">
+              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="w-8 h-8 rounded-full bg-[#FFE600] flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-[#003087]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{user?.email || "Usuario"}</p>
+                  <p className="text-[10px] text-gray-500">MaqJeez</p>
+                </div>
+              </div>
+              
+              {/* Logout Button Mobile */}
+              <button
+                onClick={() => {
+                  setSidebarOpen(false);
+                  handleLogout();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 transition mt-2"
               >
-                🏠 Inicio Maqjeez
-              </Link>
+                <LogOut className="w-4 h-4" />
+                Cerrar Sesión
+              </button>
             </div>
           </aside>
         </div>
@@ -644,6 +694,37 @@ function AppJeezInner() {
               <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">{loading || isRefreshing ? "Actualizando..." : "Actualizar"}</span>
             </button>
+
+            {/* User Info + Logout Button */}
+            <div className="flex items-center gap-2">
+              {/* User Email Badge */}
+              <div 
+                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+              >
+                <div className="w-6 h-6 rounded-full bg-[#FFE600] flex items-center justify-center">
+                  <User className="w-3 h-3 text-[#003087]" />
+                </div>
+                <span className="text-gray-300 max-w-[120px] truncate text-xs">
+                  {user?.email || "Usuario"}
+                </span>
+              </div>
+
+              {/* Logout Button - PROMINENT */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+                style={{ 
+                  background: "linear-gradient(135deg, #ef4444, #dc2626)", 
+                  color: "#fff", 
+                  border: "1px solid rgba(239,68,68,0.5)" 
+                }}
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Salir</span>
+              </button>
+            </div>
           </div>
         </header>
 
