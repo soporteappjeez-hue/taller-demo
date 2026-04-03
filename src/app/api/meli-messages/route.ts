@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getCurrentUser } from "@/lib/supabase";
 import { getActiveAccounts, getValidToken, meliGet } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
@@ -15,31 +14,38 @@ const supabaseAdmin = supabaseUrl && serviceRoleKey
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const sync = searchParams.get("sync") === "true"; // Forzar sincronización desde MeLi
+    const sync = searchParams.get("sync") === "true";
     
-    // Obtener usuario actual
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // Obtener cuentas activas para determinar el usuario
+    const accounts = await getActiveAccounts();
+    if (!accounts.length) {
+      return NextResponse.json({ error: "No hay cuentas configuradas" }, { status: 401 });
     }
 
-    // Si no es sincronización forzada, leer de caché
-    if (!sync) {
+    // Obtener user_id de la primera cuenta
+    const { data: accountData } = await supabaseAdmin
+      ?.from("linked_meli_accounts")
+      .select("user_id")
+      .eq("meli_user_id", String(accounts[0].meli_user_id))
+      .single() || { data: null };
+
+    const userId = accountData?.user_id;
+
+    // Si no es sincronización forzada y tenemos userId, leer de caché
+    if (!sync && userId) {
       const { data: cachedQuestions, error } = await supabaseAdmin
         ?.from("meli_questions_sync")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("status", "UNANSWERED")
         .order("meli_created_date", { ascending: false })
         .limit(100) || { data: null, error: null };
 
       if (error) {
         console.error("[Mensajes] Error leyendo caché:", error);
-        // Fallback a sincronización si hay error
       } else if (cachedQuestions && cachedQuestions.length > 0) {
         console.log(`[Mensajes] ${cachedQuestions.length} preguntas desde caché`);
         
-        // Mapear al formato esperado por el frontend
         const questions = cachedQuestions.map(q => ({
           id: q.id,
           meli_question_id: parseInt(q.id),
@@ -53,7 +59,7 @@ export async function GET(req: Request) {
           status: q.status,
           date_created: q.meli_created_date,
           answer_text: null,
-          meli_accounts: { nickname: q.meli_user_id }, // Simplificado
+          meli_accounts: { nickname: q.meli_user_id },
         }));
 
         return NextResponse.json({ 
@@ -67,7 +73,6 @@ export async function GET(req: Request) {
 
     // Fallback: Sincronizar desde MeLi
     console.log("[Mensajes] Sincronizando desde MeLi...");
-    const accounts = await getActiveAccounts();
     
     const allQuestions: any[] = [];
     
@@ -78,7 +83,6 @@ export async function GET(req: Request) {
 
         const meliUserId = String(account.meli_user_id);
         
-        // Obtener preguntas sin responder de MeLi
         const searchData = await meliGet(
           `/users/${meliUserId}/questions/search?status=UNANSWERED&limit=50`,
           token
@@ -93,29 +97,29 @@ export async function GET(req: Request) {
           from?: { nickname: string };
         }>;
 
-        // Obtener detalles de cada pregunta
         for (const q of questions) {
-          // Obtener detalles del ítem
           const itemData = await meliGet(`/items/${q.item_id}`, token) as { title: string; thumbnail: string } | null;
 
-          // Guardar en caché
-          const questionRecord = {
-            id: q.id,
-            user_id: user.id,
-            meli_user_id: meliUserId,
-            item_id: q.item_id,
-            title_item: itemData?.title || "Producto sin título",
-            item_thumbnail: itemData?.thumbnail?.replace("http://", "https://") || null,
-            question_text: q.text,
-            status: q.status,
-            buyer_nickname: q.from?.nickname || "Usuario",
-            meli_created_date: q.date_created,
-            updated_at: new Date().toISOString(),
-          };
+          // Guardar en caché si tenemos userId
+          if (userId) {
+            const questionRecord = {
+              id: q.id,
+              user_id: userId,
+              meli_user_id: meliUserId,
+              item_id: q.item_id,
+              title_item: itemData?.title || "Producto sin título",
+              item_thumbnail: itemData?.thumbnail?.replace("http://", "https://") || null,
+              question_text: q.text,
+              status: q.status,
+              buyer_nickname: q.from?.nickname || "Usuario",
+              meli_created_date: q.date_created,
+              updated_at: new Date().toISOString(),
+            };
 
-          await supabaseAdmin
-            ?.from("meli_questions_sync")
-            .upsert(questionRecord, { onConflict: "id" });
+            await supabaseAdmin
+              ?.from("meli_questions_sync")
+              .upsert(questionRecord, { onConflict: "id" });
+          }
 
           allQuestions.push({
             id: q.id,

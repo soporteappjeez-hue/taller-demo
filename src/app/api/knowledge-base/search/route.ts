@@ -76,10 +76,11 @@ export async function POST(req: Request) {
     }
 
     // Calcular similitud y ordenar
-    const scoredSuggestions = knowledgeEntries.map(entry => ({
-      ...entry,
-      similarity: calculateSimilarity(question_text, entry.question_keywords),
-    }));
+    const scoredSuggestions = knowledgeEntries.map(entry => {
+      const scored: any = Object.assign({}, entry);
+      scored.similarity = calculateSimilarity(question_text, entry.question_keywords);
+      return scored;
+    });
 
     // Ordenar por similitud (descendente) y tomar los mejores
     scoredSuggestions.sort((a, b) => b.similarity - a.similarity);
