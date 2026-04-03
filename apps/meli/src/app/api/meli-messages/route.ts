@@ -82,12 +82,19 @@ export async function GET(req: Request) {
         const searchData = await meliGet(
           `/users/${meliUserId}/questions/search?status=UNANSWERED&limit=50`,
           token
-        ) as { questions?: Array<{ id: string; item_id: string; status: string; text: string; date_created: string; from?: { nickname: string } }> | null;
+        ) as Record<string, unknown> | null;
 
-        const questionIds = searchData?.questions?.map(q => q.id) || [];
+        const questions = (searchData?.questions || []) as Array<{
+          id: string;
+          item_id: string;
+          status: string;
+          text: string;
+          date_created: string;
+          from?: { nickname: string };
+        }>;
 
         // Obtener detalles de cada pregunta
-        for (const q of searchData?.questions || []) {
+        for (const q of questions) {
           // Obtener detalles del ítem
           const itemData = await meliGet(`/items/${q.item_id}`, token) as { title: string; thumbnail: string } | null;
 
