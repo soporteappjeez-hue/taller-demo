@@ -83,7 +83,13 @@ function ConfigMeliContent() {
   const loadAccounts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/meli-accounts");
+      // Obtener token de sesión
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      const res = await fetch("/api/meli-accounts", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+      });
       const data = await res.json();
       if (Array.isArray(data)) setAccounts(data as MeliAccount[]);
     } catch { /* silencioso */ }
@@ -100,9 +106,16 @@ function ConfigMeliContent() {
   // ── Revocar cuenta ─────────────────────────────────────────
   const handleRevoke = async (id: string, nickname: string) => {
     if (!confirm(`¿Desconectar la cuenta @${nickname}? Deberás volver a autorizar.`)) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
     const res = await fetch("/api/meli-accounts", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ id, status: "revoked" }),
     });
     if (!res.ok) { showToast("Error al revocar", false); return; }
@@ -112,9 +125,16 @@ function ConfigMeliContent() {
 
   const handleDelete = async (id: string, nickname: string) => {
     if (!confirm(`¿ELIMINAR permanentemente la cuenta @${nickname}? No se puede deshacer.`)) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
     const res = await fetch("/api/meli-accounts", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ id }),
     });
     if (!res.ok) { showToast("Error al eliminar", false); return; }
@@ -124,9 +144,16 @@ function ConfigMeliContent() {
 
   const handleRename = async (id: string) => {
     if (!editName.trim()) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
     const res = await fetch("/api/meli-accounts", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ id, nickname: editName.trim() }),
     });
     if (!res.ok) { showToast("Error al renombrar", false); return; }

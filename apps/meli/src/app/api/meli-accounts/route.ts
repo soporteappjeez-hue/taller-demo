@@ -1,33 +1,29 @@
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-// Helper para obtener el usuario autenticado desde cookies
-async function getAuthenticatedUser() {
-  try {
-    const cookieStore = cookies();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    
-    // Obtener el token de sesión de las cookies
-    const authCookie = cookieStore.get('sb-access-token') || cookieStore.get('sb-refresh-token');
-    
-    if (!authCookie) return null;
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (error || !user) return null;
+// Helper para obtener el usuario desde el token o sesión
+async function getUserFromRequest(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "");
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  if (token) {
+    const { data: { user } } = await supabase.auth.getUser(token);
     return user;
-  } catch {
-    return null;
   }
+  
+  // Para requests con cookies (navegador)
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
 }
 
 // GET - Obtener cuentas MeLi del usuario autenticado
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUserFromRequest(request);
     
     if (!user) {
       console.error("[meli-accounts] ❌ Usuario no autenticado");
@@ -38,11 +34,11 @@ export async function GET() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error("[meli-accounts] ❌ Falta SUPABASE_URL o SERVICE_ROLE_KEY");
+      console.error("[meli-accounts] ❌ Faltan variables de entorno");
       return NextResponse.json([], { status: 200 });
     }
 
-    // Usar cliente con service_role para saltar RLS en el backend
+    // Usar cliente con service_role para saltar RLS
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Multi-tenant: Solo obtener cuentas del usuario autenticado
@@ -80,7 +76,7 @@ export async function GET() {
 // PATCH - Actualizar cuenta (revocar o renombrar)
 export async function PATCH(req: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUserFromRequest(req);
     
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -95,7 +91,6 @@ export async function PATCH(req: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error("[meli-accounts PATCH] ❌ Falta SUPABASE_URL o SERVICE_ROLE_KEY");
       return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
     }
 
@@ -128,7 +123,7 @@ export async function PATCH(req: Request) {
 // DELETE - Eliminar cuenta
 export async function DELETE(req: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUserFromRequest(req);
     
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -141,7 +136,6 @@ export async function DELETE(req: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error("[meli-accounts DELETE] ❌ Falta SUPABASE_URL o SERVICE_ROLE_KEY");
       return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
     }
 
