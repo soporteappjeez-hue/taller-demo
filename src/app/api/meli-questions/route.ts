@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getActiveAccounts, getValidToken } from "@/lib/meli";
+import { getActiveAccountsForUser, getValidToken, getAuthenticatedUserId, LinkedMeliAccount } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,7 +9,13 @@ export async function GET(req: Request) {
   const logs: string[] = [];
 
   try {
-    const accounts = await getActiveAccounts();
+    // Verificar usuario autenticado
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    
+    const accounts = await getActiveAccountsForUser(userId);
     logs.push(`accounts_count:${accounts.length}`);
 
     if (!accounts.length) {
@@ -22,7 +28,7 @@ export async function GET(req: Request) {
 
     for (let accIdx = 0; accIdx < accounts.length; accIdx++) {
       const acc   = accounts[accIdx];
-      const alog: Record<string, unknown> = { nickname: acc.nickname, meli_user_id: acc.meli_user_id };
+      const alog: Record<string, unknown> = { nickname: acc.meli_nickname, meli_user_id: acc.meli_user_id };
       try {
         const token = await getValidToken(acc);
         if (!token) { alog.token_ok = false; alog.error = "token_expired"; accLogs.push(alog); continue; }
@@ -82,7 +88,7 @@ export async function GET(req: Request) {
             date_created:     q.date_created,
             answer_text:      q.answer?.text ?? null,
             answer_date:      q.answer?.date_created ?? null,
-            meli_accounts:    { nickname: acc.nickname },
+            meli_accounts:    { nickname: acc.meli_nickname },
           });
         }
       } catch (err) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getActiveAccounts, getValidToken, meliGet } from "@/lib/meli";
+import { getActiveAccountsForUser, getValidToken, meliGet, getAuthenticatedUserId } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,7 +36,13 @@ interface MeliShipment {
 
 export async function GET() {
   try {
-    const accounts = await getActiveAccounts();
+    // Verificar usuario autenticado
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    
+    const accounts = await getActiveAccountsForUser(userId);
     if (!accounts.length) return NextResponse.json({ ready: [], upcoming: [], full_count: 0, turbo_count: 0 });
 
     const ready:    object[] = [];
@@ -65,7 +71,7 @@ export async function GET() {
           return {
             shipment_id:     s.id,
             order_id:        s.order_id ?? null,
-            account:         acc.nickname,
+            account:         acc.meli_nickname,
             logistic_type:   s.logistic_type ?? "unknown",
             type:            logType,
             substatus:       s.substatus ?? null,

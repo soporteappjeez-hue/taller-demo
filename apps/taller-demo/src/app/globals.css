@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+
+  /* ── Deep Space Dark Mode (default) ── */
+  body {
+    background-color: #121212;
+    color: #F3F4F6;
+    @apply antialiased;
+  }
+
+  /* ── Light mode (opt-in via class) ── */
+  html.light body {
+    background-color: #F9FAFB;
+    color: #111827;
+  }
+}
+
+@layer components {
+  /* ── Glass Card (Deep Space) ── */
+  .card {
+    background: rgba(31, 31, 31, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    @apply border border-white/10 rounded-2xl p-4;
+  }
+  html.light .card {
+    background: #ffffff;
+    backdrop-filter: none;
+    @apply border-gray-200 shadow-sm;
+  }
+
+  /* ── Neon stat cards ── */
+  .card-neon-orange {
+    background: rgba(31, 31, 31, 0.90);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 87, 34, 0.50);
+    box-shadow: 0 0 18px 2px rgba(255, 87, 34, 0.25);
+    @apply rounded-2xl p-4;
+  }
+  .card-neon-cyan {
+    background: rgba(31, 31, 31, 0.90);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 229, 255, 0.45);
+    box-shadow: 0 0 18px 2px rgba(0, 229, 255, 0.20);
+    @apply rounded-2xl p-4;
+  }
+  .card-neon-green {
+    background: rgba(31, 31, 31, 0.90);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(57, 255, 20, 0.45);
+    box-shadow: 0 0 18px 2px rgba(57, 255, 20, 0.20);
+    @apply rounded-2xl p-4;
+  }
+  .card-neon-gold {
+    background: rgba(31, 31, 31, 0.90);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 215, 0, 0.45);
+    box-shadow: 0 0 18px 2px rgba(255, 215, 0, 0.20);
+    @apply rounded-2xl p-4;
+  }
+
+  .card-alert {
+    background: rgba(127, 29, 29, 0.30);
+    @apply border border-red-500/50 rounded-2xl p-4;
+  }
+  html.light .card-alert {
+    @apply bg-red-50 border-red-300;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+           transition-all duration-150 active:scale-95 select-none cursor-pointer
+           min-h-[52px] px-5 text-base;
+  }
+  /* Primary = Naranja Maqjeez con glow */
+  .btn-primary {
+    background: #FF5722;
+    color: #fff;
+    box-shadow: 0 0 20px 2px rgba(255,87,34,0.40);
+    @apply btn hover:brightness-110 active:brightness-90;
+  }
+  .btn-secondary {
+    @apply btn bg-white/10 text-gray-200 hover:bg-white/15 border border-white/10 active:bg-white/5;
+  }
+  html.light .btn-secondary { @apply bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-300; }
+  .btn-danger    { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-ghost     { @apply btn bg-transparent text-gray-300 hover:bg-white/10; }
+  html.light .btn-ghost { @apply text-gray-600 hover:bg-gray-100; }
+  .btn-whatsapp  {
+    background: #25D366;
+    color: #fff;
+    box-shadow: 0 0 16px 2px rgba(37,211,102,0.35);
+    @apply btn hover:brightness-110;
+  }
+  .btn-sm        { @apply min-h-[40px] px-3 text-sm; }
+  /* Azul Maqjeez para Flex/escáner */
+  .btn-blue {
+    background: #1E3A8A;
+    color: #fff;
+    box-shadow: 0 0 16px 2px rgba(30,58,138,0.40);
+    @apply btn hover:brightness-125 active:brightness-90;
+  }
+
+  /* ── Inputs ── */
+  .input {
+    background: rgba(255,255,255,0.06);
+    @apply w-full rounded-xl border border-white/15 text-gray-100
+           placeholder-gray-500 px-4 py-3 text-base
+           focus:outline-none focus:ring-2 focus:ring-[#FF5722] focus:border-transparent
+           transition-colors min-h-[52px];
+  }
+  html.light .input {
+    @apply bg-white border-gray-300 text-gray-900 placeholder-gray-400;
+  }
+  .input-sm { @apply min-h-[44px] py-2 text-sm; }
+
+  .label { @apply block text-sm font-semibold text-gray-300 mb-1; }
+  html.light .label { @apply text-gray-700; }
+
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1
+           rounded-full border uppercase tracking-wide;
+  }
+
+  /* ── Neon text helpers ── */
+  .text-neon    { color: #39FF14; text-shadow: 0 0 8px rgba(57,255,20,0.70); }
+  .text-cyan    { color: #00E5FF; text-shadow: 0 0 8px rgba(0,229,255,0.70); }
+  .text-orange-neon { color: #FF5722; text-shadow: 0 0 8px rgba(255,87,34,0.70); }
+  .text-gold    { color: #FFD700; text-shadow: 0 0 8px rgba(255,215,0,0.70); }
+
+  /* ── Print styles ── */
+  @media print {
+    .no-print   { display: none !important; }
+    .only-print { display: inline !important; }
+    body { background: white !important; color: black !important; }
+    @page { margin: 0.8cm; size: A4; }
+  }
+  .only-print { display: none; }
+  .print-only { display: none; }
+}

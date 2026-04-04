@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { getActiveAccounts, getValidToken, meliGet } from "@/lib/meli";
+import { getActiveAccountsForUser, getValidToken, meliGet, getAuthenticatedUserId, LinkedMeliAccount } from "@/lib/meli";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic  = "force-dynamic";
 export const revalidate = 0;
 
 // Formato simple para selector de publicaciones
-async function getSimplePublications(accountId: string, limit: number, status: string) {
-  const accounts = await getActiveAccounts();
+async function getSimplePublications(accountId: string, limit: number, status: string, userId: string) {
+  const accounts = await getActiveAccountsForUser(userId);
   const account = accounts.find(a => String(a.meli_user_id) === accountId);
   if (!account) return null;
 
@@ -20,7 +20,7 @@ async function getSimplePublications(accountId: string, limit: number, status: s
   ) as { results?: string[]; paging?: { total: number } } | null;
 
   const itemIds = searchData?.results ?? [];
-  if (!itemIds.length) return { publications: [], total: 0, account: account.nickname };
+  if (!itemIds.length) return { publications: [], total: 0, account: account.meli_nickname };
 
   // Obtener detalles en lotes de 20
   const publications: Array<{
@@ -57,11 +57,17 @@ async function getSimplePublications(accountId: string, limit: number, status: s
     ok: true,
     publications,
     total: searchData?.paging?.total ?? publications.length,
-    account: account.nickname,
+    account: account.meli_nickname,
   };
 }
 
 export async function GET(req: Request) {
+  // Verificar usuario autenticado
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+  
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get("account_id");
   const limit = parseInt(searchParams.get("limit") ?? "50", 10);
@@ -71,7 +77,7 @@ export async function GET(req: Request) {
 
   // Si se pide formato simple, usar el nuevo método
   if (format === "simple" && accountId) {
-    const result = await getSimplePublications(accountId, limit, status);
+    const result = await getSimplePublications(accountId, limit, status, userId);
     if (!result) {
       return NextResponse.json({ error: "Cuenta no encontrada o token inválido" }, { status: 404 });
     }
@@ -79,7 +85,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    let accounts = await getActiveAccounts();
+    let accounts = await getActiveAccountsForUser(userId);
     if (accountId) accounts = accounts.filter(a => a.id === accountId);
     if (!accounts.length) return NextResponse.json([]);
 
@@ -117,17 +123,17 @@ export async function GET(req: Request) {
             cached_at = new Date().toISOString();
           } else {
             // Si hay error en Supabase, intentar fallback a MeLi
-            console.warn(`[meli-publications] Supabase read failed for ${acc.nickname}, falling back to MeLi`);
+            console.warn(`[meli-publications] Supabase read failed for ${acc.meli_nickname}, falling back to MeLi`);
             items = [];
           }
         }
 
         // Si no hay datos en cache, sincronizar desde MeLi
         if (items.length === 0) {
-          console.log(`[meli-publications] Syncing from MeLi for ${acc.nickname}`);
+          console.log(`[meli-publications] Syncing from MeLi for ${acc.meli_nickname}`);
           const token = await getValidToken(acc);
           if (!token) {
-            return { account: acc.nickname, meli_user_id: uid, items: [], total: 0, error: "token_expired" };
+            return { account: acc.meli_nickname, meli_user_id: uid, items: [], total: 0, error: "token_expired" };
           }
 
           const searchData = await meliGet(
@@ -137,7 +143,7 @@ export async function GET(req: Request) {
           const itemIds: string[] = searchData?.results ?? [];
 
           if (!itemIds.length) {
-            return { account: acc.nickname, meli_user_id: uid, items: [], total: 0 };
+            return { account: acc.meli_nickname, meli_user_id: uid, items: [], total: 0 };
           }
 
           const chunks: string[][] = [];
@@ -183,7 +189,7 @@ export async function GET(req: Request) {
             const productsToCache = allItems.map(item => ({
               id: (item as any).id,
               meli_user_id: uid,
-              account_name: acc.nickname,
+              account_name: acc.meli_nickname,
               title: (item as any).title,
               price: (item as any).price,
               currency_id: (item as any).currency_id,
@@ -202,7 +208,7 @@ export async function GET(req: Request) {
                 await supabase
                   .from("products_cache")
                   .upsert(productsToCache, { onConflict: "id" });
-                console.log(`[meli-publications] Cached ${productsToCache.length} items for ${acc.nickname}`);
+                console.log(`[meli-publications] Cached ${productsToCache.length} items for ${acc.meli_nickname}`);
               } catch (e) {
                 console.error(`[meli-publications] Cache error:`, e);
               }
@@ -211,7 +217,7 @@ export async function GET(req: Request) {
         }
 
         return {
-          account:      acc.nickname,
+          account:      acc.meli_nickname,
           meli_user_id: uid,
           items:        items,
           total:        total,
@@ -219,7 +225,7 @@ export async function GET(req: Request) {
         };
       } catch (e) {
         return {
-          account:      acc.nickname,
+          account:      acc.meli_nickname,
           meli_user_id: String(acc.meli_user_id),
           items:        [],
           total:        0,

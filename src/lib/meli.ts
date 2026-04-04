@@ -1,15 +1,42 @@
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 // Configuración
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const ENC_KEY = process.env.APPJEEZ_MELI_ENCRYPTION_KEY!;
 const APP_ID = process.env.APPJEEZ_MELI_APP_ID ?? "";
 const SECRET_KEY = process.env.APPJEEZ_MELI_SECRET_KEY ?? "";
 
-// Cliente Supabase
+// Cliente Supabase Admin (saltea RLS)
 export function getSupabase() {
   return createClient(SUPA_URL, SERVICE_KEY);
+}
+
+// Cliente Supabase con sesión de usuario (respeta RLS)
+export async function getSupabaseWithAuth() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("sb-access-token")?.value;
+  
+  if (!token) return null;
+  
+  return createClient(SUPA_URL, ANON_KEY, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+
+// Obtener user_id del usuario autenticado
+export async function getAuthenticatedUserId(): Promise<string | null> {
+  const supa = await getSupabaseWithAuth();
+  if (!supa) return null;
+  
+  const { data: { user } } = await supa.auth.getUser();
+  return user?.id ?? null;
 }
 
 // ── ENCRIPTACIÓN AES-GCM ───────────────────────────────────────
@@ -340,4 +367,18 @@ export async function updateAccountTokens(
     p_expires_at: expiresAt,
   });
   return newTokens.access_token;
+}
+
+// ── FUNCIÓN SEGURA: Obtener cuentas del usuario autenticado ────────────────
+// Esta es la función que DEBES usar en las APIs para respetar el multi-tenant
+export async function getActiveAccountsForUser(userId: string): Promise<LinkedMeliAccount[]> {
+  return getUserLinkedAccounts(userId);
+}
+
+// ── FUNCIÓN SEGURA: Obtener cuentas desde el request ──────────────────────
+// Usa esta función en las APIs para obtener las cuentas del usuario autenticado
+export async function getUserAccountsFromRequest(): Promise<LinkedMeliAccount[]> {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) return [];
+  return getUserLinkedAccounts(userId);
 }

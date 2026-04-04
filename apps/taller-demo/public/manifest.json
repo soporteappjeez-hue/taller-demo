@@ -1,0 +1,10 @@
+{
+  "name": "Demo AppJeez para Service Tecnicos",
+  "short_name": "AppJeez",
+  "description": "Administra tu comercio de la mejor manera y organizada",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#f97316",
+  "icons": []
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveAccounts, getValidToken, meliGet, meliGetWithRetry, MeliAccount } from "@/lib/meli";
+import { getActiveAccountsForUser, getValidToken, meliGet, meliGetWithRetry, getAuthenticatedUserId, LinkedMeliAccount } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -76,7 +76,7 @@ function getPeriodDates(
 }
 
 async function processAccount(
-  acc: MeliAccount,
+  acc: LinkedMeliAccount,
   from: Date,
   to: Date,
   days: number,
@@ -94,7 +94,7 @@ async function processAccount(
   const date = String(from.getUTCDate()).padStart(2, '0');
   const fromStr = `${year}-${month}-${date}`;
   
-  console.log(`[stats-acct] account=${acc.nickname}, fromStr=${fromStr}, from.UTC=${year}-${month}-${date}`);
+  console.log(`[stats-acct] account=${acc.meli_nickname}, fromStr=${fromStr}, from.UTC=${year}-${month}-${date}`);
 
   // ── Fetch orders ──────────────────────────────────────────────────────────
   const allOrders: Record<string, unknown>[] = [];
@@ -226,7 +226,7 @@ async function processAccount(
   const ratings      = transactions?.ratings as Record<string, unknown> | undefined;
 
   const reputation = rep ? {
-    account: acc.nickname,
+    account: acc.meli_nickname,
     meli_user_id: uid,
     level_id:           (rep.level_id as string | undefined) ?? "unknown",
     power_seller_status:(rep.power_seller_status as string | undefined) ?? null,
@@ -242,7 +242,7 @@ async function processAccount(
   const totalAmount = orders.reduce((s, o) => s + ((o.total_amount as number | undefined) ?? 0), 0);
 
   return {
-    account:       acc.nickname,
+    account:       acc.meli_nickname,
     meli_user_id:  uid,
     sales_by_day:  Array.from(salesMap.entries()).map(([date, v]) => ({ date, ...v })),
     sales_by_logistic: salesByLogistic,
@@ -262,6 +262,12 @@ async function processAccount(
 
 export async function GET(req: NextRequest) {
   try {
+    // Verificar usuario autenticado
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    
     const { searchParams } = new URL(req.url);
     const period    = searchParams.get("period")     ?? "7d";
     const accountId = searchParams.get("account_id") ?? "all";
@@ -274,13 +280,13 @@ export async function GET(req: NextRequest) {
     // Debug logging
     console.log(`[meli-stats] period=${period}, tzOffset=${tzOffset}, from=${from.toISOString()}, to=${to.toISOString()}, days=${days}`);
 
-    const allAccounts = await getActiveAccounts();
+    const allAccounts = await getActiveAccountsForUser(userId);
     if (!allAccounts.length)
       return NextResponse.json({ error: "No hay cuentas activas" }, { status: 400 });
 
     const accounts = accountId === "all"
       ? allAccounts
-      : allAccounts.filter(a => String(a.meli_user_id) === accountId || a.nickname === accountId);
+      : allAccounts.filter(a => String(a.meli_user_id) === accountId || a.meli_nickname === accountId);
 
     if (!accounts.length)
       return NextResponse.json({ error: "Cuenta no encontrada" }, { status: 404 });

@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { getActiveAccounts, getValidToken, meliGet, MeliAccount } from "@/lib/meli";
+import { getActiveAccountsForUser, getValidToken, meliGet, getAuthenticatedUserId, LinkedMeliAccount } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function processAccount(acc: MeliAccount) {
+async function processAccount(acc: LinkedMeliAccount) {
   try {
     const token = await getValidToken(acc);
     if (!token) {
       return {
-        account: acc.nickname, meli_user_id: String(acc.meli_user_id),
+        account: acc.meli_nickname, meli_user_id: String(acc.meli_user_id),
         error: "token_expired", unanswered_questions: 0, pending_messages: 0,
         ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
         claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
@@ -35,7 +35,7 @@ async function processAccount(acc: MeliAccount) {
     const rep = userData?.seller_reputation ?? null;
 
     return {
-      account:              acc.nickname,
+      account:              acc.meli_nickname,
       meli_user_id:         uid,
       unanswered_questions: questions?.total ?? 0,
       pending_messages:     0,
@@ -62,11 +62,11 @@ async function processAccount(acc: MeliAccount) {
     };
   } catch (err) {
     const errMsg = (err as Error).message;
-    console.error(`[processAccount] Error para ${acc.nickname}:`, errMsg);
+    console.error(`[processAccount] Error para ${acc.meli_nickname}:`, errMsg);
     
     if (errMsg.includes("HTTP_451_BLOCKED")) {
       return {
-        account: acc.nickname, meli_user_id: String(acc.meli_user_id),
+        account: acc.meli_nickname, meli_user_id: String(acc.meli_user_id),
         error: "http_451_blocked", unanswered_questions: 0, pending_messages: 0,
         ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
         claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
@@ -75,7 +75,7 @@ async function processAccount(acc: MeliAccount) {
     }
 
     return {
-      account: acc.nickname, meli_user_id: String(acc.meli_user_id),
+      account: acc.meli_nickname, meli_user_id: String(acc.meli_user_id),
       error: errMsg, unanswered_questions: 0, pending_messages: 0,
       ready_to_ship: 0, total_items: 0, today_orders: 0, today_sales_amount: 0, 
       claims_count: 0, measurement_date: new Date().toISOString(), metrics_period: "Últimos 60 días",
@@ -86,28 +86,15 @@ async function processAccount(acc: MeliAccount) {
 
 export async function GET() {
   try {
-    console.log("[meli-dashboard] Consultando cuentas activas...");
-    const accounts = await getActiveAccounts();
-    console.log("[meli-dashboard] ✅ Cuentas encontradas:", accounts.length);
-    if (accounts.length === 0) {
-      console.warn("[meli-dashboard] ⚠️ getActiveAccounts() retornó vacío. Consultando tabla directamente...");
-      // Fallback: intentar consultar directamente
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-      const { data, error } = await supabase
-        .from("meli_accounts")
-        .select("*")
-        .eq("status", "active");
-      if (error) {
-        console.error("[meli-dashboard] Error en fallback query:", error);
-        return NextResponse.json([]);
-      }
-      console.log("[meli-dashboard] Fallback encontró:", data?.length ?? 0, "cuentas");
-      console.log("[meli-dashboard] Datos:", JSON.stringify(data, null, 2));
+    // Verificar usuario autenticado
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
+    
+    console.log("[meli-dashboard] Consultando cuentas activas para usuario:", userId);
+    const accounts = await getActiveAccountsForUser(userId);
+    console.log("[meli-dashboard] ✅ Cuentas encontradas:", accounts.length);
     
     if (!accounts.length) return NextResponse.json([]);
 

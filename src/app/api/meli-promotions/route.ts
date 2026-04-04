@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase, getActiveAccounts, getValidToken, meliGet } from "@/lib/meli";
+import { getSupabase, getActiveAccountsForUser, getValidToken, meliGet, getAuthenticatedUserId } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -49,6 +49,12 @@ async function logAction(
 }
 
 export async function GET(req: Request) {
+  // Verificar usuario autenticado
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+  
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action") ?? "scan";
   const supabase = getSupabase();
@@ -70,7 +76,7 @@ export async function GET(req: Request) {
   const dryRun       = searchParams.get("dry_run") === "true"; // solo simular sin aceptar
 
   try {
-    const allAccounts = await getActiveAccounts();
+    const allAccounts = await getActiveAccountsForUser(userId);
     const accounts = accountIdRaw === "all"
       ? allAccounts
       : allAccounts.filter(a => String(a.meli_user_id) === accountIdRaw);
@@ -86,7 +92,7 @@ export async function GET(req: Request) {
       if (!token) continue;
 
       const result: ScanResult = {
-        account: acc.nickname,
+        account: acc.meli_nickname,
         meli_user_id: String(acc.meli_user_id),
         accepted: [],
         skipped:  [],
@@ -151,7 +157,7 @@ export async function GET(req: Request) {
                 result.errors.push(offerObj);
                 await logAction(supabase, {
                   meli_user_id: String(acc.meli_user_id),
-                  account: acc.nickname,
+                  account: acc.meli_nickname,
                   item_id: itemId, item_title: itemTitle,
                   promotion_id: promotionId, promotion_type: promotionType,
                   requested_discount_pct: discountPct, max_allowed_pct: maxPct,
@@ -165,7 +171,7 @@ export async function GET(req: Request) {
             result.accepted.push(offerObj);
             await logAction(supabase, {
               meli_user_id: String(acc.meli_user_id),
-              account: acc.nickname,
+              account: acc.meli_nickname,
               item_id: itemId, item_title: itemTitle,
               promotion_id: promotionId, promotion_type: promotionType,
               requested_discount_pct: discountPct, max_allowed_pct: maxPct,
@@ -179,7 +185,7 @@ export async function GET(req: Request) {
             result.skipped.push(offerObj);
             await logAction(supabase, {
               meli_user_id: String(acc.meli_user_id),
-              account: acc.nickname,
+              account: acc.meli_nickname,
               item_id: itemId, item_title: itemTitle,
               promotion_id: promotionId, promotion_type: promotionType,
               requested_discount_pct: discountPct, max_allowed_pct: maxPct,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase, getActiveAccounts, getValidToken, meliGet, meliGetRaw, meliGetWithRetry } from "@/lib/meli";
+import { getSupabase, getActiveAccountsForUser, getValidToken, meliGet, meliGetRaw, meliGetWithRetry, getAuthenticatedUserId } from "@/lib/meli";
 import { calculateZoneDistance, classifyFlexZone } from "@/lib/zone-calc";
 import { PDFDocument } from "pdf-lib";
 import { inflateRawSync } from "zlib";
@@ -111,7 +111,7 @@ function classifyType(logisticType: string, tags: string[], substatus?: string, 
 
 function parseOrder(
   order: Record<string, unknown>,
-  acc: { nickname: string; meli_user_id: number | string }
+  acc: { nickname?: string; meli_nickname?: string; meli_user_id: number | string }
 ): ShipmentInfo | null {
   const ship = order.shipping as Record<string, unknown> | undefined;
   if (!ship?.id) return null;
@@ -148,12 +148,15 @@ function parseOrder(
     ?.filter(attr => attr.value_name?.trim())
     .map(attr => `${attr.name}: ${attr.value_name}`)
     .join(', ') || null;
+    
+  // Obtener nickname (compatible con ambos tipos de cuenta)
+  const accountNickname = acc.nickname || acc.meli_nickname || "Unknown";
 
   return {
     shipment_id:    sid,
     order_id:       (order.id as number | undefined) ?? null,
     order_date:     (order.date_created as string | undefined) ?? null,
-    account:        String(acc.nickname),
+    account:        accountNickname,
     meli_user_id:   String(acc.meli_user_id),
     type,
     buyer:          `${(buyer?.first_name as string | undefined) ?? ""} ${(buyer?.last_name as string | undefined) ?? ""}`.trim(),
@@ -200,6 +203,13 @@ export async function GET(req: Request) {
   const action = searchParams.get("action") ?? "list";
   const format = searchParams.get("format") ?? "pdf";
   const tzOffset = parseFloat(searchParams.get("tz_offset") ?? "0");
+  
+  // Obtener user_id del usuario autenticado
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+  
   const supabase = getSupabase();
 
   // Función helper para ajustar fechas a zona horaria local
@@ -240,15 +250,18 @@ export async function GET(req: Request) {
       query = query.gte("printed_at", weekAgo.toISOString()) as typeof query;
     }
 
+    // Filtrar por user_id del usuario autenticado
+    query = query.eq("user_id", userId);
+    
     const { data } = await query;
     return NextResponse.json({ shipments: data ?? [] });
   }
 
   try {
-    const accounts = await getActiveAccounts();
+    const accounts = await getActiveAccountsForUser(userId);
     if (!accounts.length) return NextResponse.json({ shipments: [], full: [], in_transit: [], returns: [], delayed_unshipped: [], delayed_in_transit: [], summary: {} });
 
-    const { data: printed } = await supabase.from("meli_printed_labels").select("shipment_id, printed_at");
+    const { data: printed } = await supabase.from("meli_printed_labels").select("shipment_id, printed_at").eq("user_id", userId);
     const printedMap = new Map((printed ?? []).map((p: { shipment_id: number; printed_at: string }) => [p.shipment_id, p.printed_at]));
     const printedSet = new Set(printedMap.keys());
 

@@ -1,4 +1,4 @@
-import { getSupabase, getActiveAccounts, getValidToken } from "@/lib/meli";
+import { getSupabase, getActiveAccountsForUser, getValidToken, getAuthenticatedUserId } from "@/lib/meli";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -122,6 +122,12 @@ function sse(data: unknown): string {
 
 /* ── POST handler ────────────────────────────────────────────────── */
 export async function POST(req: Request) {
+  // Verificar usuario autenticado
+  const authUserId = await getAuthenticatedUserId();
+  if (!authUserId) {
+    return new Response(sse({ type: "error", message: "No autenticado" }), { status: 401, headers: { "Content-Type": "text/event-stream" } });
+  }
+  
   const body = await req.json() as {
     keyword: string;
     exclude_words?: string;
@@ -154,7 +160,7 @@ export async function POST(req: Request) {
     await supabase.from("items_keyword_cache").delete().eq("keyword", normKeyword);
   }
 
-  let accounts = await getActiveAccounts();
+  let accounts = await getActiveAccountsForUser(authUserId);
   if (account_ids?.length) {
     accounts = accounts.filter(a => account_ids!.includes(String(a.meli_user_id)));
   }
@@ -194,11 +200,11 @@ export async function POST(req: Request) {
 
         const token = await getValidToken(acc);
         if (!token) {
-          await send({ type: "account_skip", account: acc.nickname, reason: "token_expired" });
+          await send({ type: "account_skip", account: acc.meli_nickname, reason: "token_expired" });
           continue;
         }
 
-        await send({ type: "account_start", account: acc.nickname });
+        await send({ type: "account_start", account: acc.meli_nickname });
 
         // Usa el buscador de MeLi directamente con la keyword (igual que el panel del vendedor)
         const allIds = await getMatchingIds(String(acc.meli_user_id), token, keyword, signal);
@@ -207,7 +213,7 @@ export async function POST(req: Request) {
         const idsToCheck = allIds;  // Ya son solo los que coinciden con la keyword
 
         const total = idsToCheck.length;
-        await send({ type: "account_total", account: acc.nickname, total, totalScanned });
+        await send({ type: "account_total", account: acc.meli_nickname, total, totalScanned });
 
         const newCacheRows: Array<{ item_id: string; keyword: string; contains_match: boolean; last_price: number | null; checked_at: string }> = [];
 
@@ -234,7 +240,7 @@ export async function POST(req: Request) {
 
             if (!matches) {
               newCacheRows.push({ item_id: item.id, keyword: normKeyword, contains_match: false, last_price: item.price, checked_at: new Date().toISOString() });
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "no_match", account: acc.nickname });
+              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "no_match", account: acc.meli_nickname });
               continue;
             }
 
@@ -242,8 +248,8 @@ export async function POST(req: Request) {
             const excludedBy = isExcluded(normTitle, excludeNorm);
             if (excludedBy) {
               newCacheRows.push({ item_id: item.id, keyword: normKeyword, contains_match: true, last_price: item.price, checked_at: new Date().toISOString() });
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "excluded", excluded_by: excludedBy, account: acc.nickname });
-              results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "excluded", reason: `Excluido por: "${excludedBy}"` });
+              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "excluded", excluded_by: excludedBy, account: acc.meli_nickname });
+              results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "excluded", reason: `Excluido por: "${excludedBy}"` });
               continue;
             }
 
@@ -265,37 +271,37 @@ export async function POST(req: Request) {
               );
 
               if (!needsBase && varsToUpdate.length === 0) {
-                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
+                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.meli_nickname });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
                 continue;
               }
 
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
+              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.meli_nickname });
 
               if (!dry_run) {
                 const putBody: Record<string, unknown> = { variations: updatedVars.map(v => ({ id: v.id, price: v.price })) };
                 if (needsBase) putBody.price = baseNew;
                 const putRes = await meliPut(`/items/${item.id}`, token, putBody, signal);
                 const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message, variations_updated: varsToUpdate.length });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message, variations_updated: varsToUpdate.length });
               } else {
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated", variations_updated: varsToUpdate.length });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated", variations_updated: varsToUpdate.length });
               }
             } else {
               if (!needsBase) {
-                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.nickname });
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
+                await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: "skipped", account: acc.meli_nickname });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: item.price, status: "skipped", reason: "Ya cumple la condición" });
                 continue;
               }
 
-              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.nickname });
+              await send({ type: "progress", current: processed, total, item_id: item.id, title: item.title, status: dry_run ? "would_update" : "updating", old_price: item.price, new_price: baseNew, account: acc.meli_nickname });
 
               if (!dry_run) {
                 const putRes = await meliPut(`/items/${item.id}`, token, { price: baseNew }, signal);
                 const status = putRes.ok ? (isCatalog ? "catalog_warning" : "updated") : (hasPromo ? "promo_blocked" : "error");
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status, reason: putRes.ok ? (isCatalog ? "Verificar Buy Box" : undefined) : (putRes.data as Record<string,unknown>)?.message });
               } else {
-                results.push({ account: acc.nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated" });
+                results.push({ account: acc.meli_nickname, item_id: item.id, title: item.title, old_price: item.price, new_price: baseNew, status: isCatalog ? "catalog_warning" : "updated" });
               }
             }
 

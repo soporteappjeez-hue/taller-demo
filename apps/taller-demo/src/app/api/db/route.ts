@@ -1,58 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Cliente con service_role para operaciones admin
-function getSupaAdmin() {
+function getSupa() {
   return createClient(SUPA_URL, SERVICE_KEY);
 }
-
-// Cliente con sesión del usuario (respeta RLS)
-async function getSupaUser() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
-  
-  if (!token) {
-    return null;
-  }
-  
-  return createClient(SUPA_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
-}
-
-// Obtener user_id del usuario autenticado
-async function getUserId(): Promise<string | null> {
-  const supa = await getSupaUser();
-  if (!supa) return null;
-  
-  const { data: { user } } = await supa.auth.getUser();
-  return user?.id ?? null;
-}
-
-// Tablas que requieren user_id
-const USER_SCOPED_TABLES = new Set([
-  "reparaciones",
-  "stock",
-  "repuestos_a_pedir",
-  "pagos",
-  "plantillas_whatsapp",
-  "agenda_clientes",
-  "historial_reparaciones",
-  "flex_envios",
-  "etiquetas_history",
-  "etiquetas_stats",
-  "meli_printed_labels",
-  "ventas_repuestos",
-  "ventas_items",
-]);
 
 // Tablas permitidas (whitelist de seguridad)
 const ALLOWED_TABLES = new Set([
@@ -65,18 +19,14 @@ const ALLOWED_TABLES = new Set([
   "historial_reparaciones",
   "flex_envios",
   "flex_tarifas",
-  "etiquetas_history",
-  "etiquetas_stats",
-  "meli_printed_labels",
-  "ventas_repuestos",
-  "ventas_items",
 ]);
 
 // POST /api/db
+// Body: { action, table, data?, id?, filters?, order?, rpc?, rpcParams? }
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, table, data, id, filters, order, rpc, rpcParams, onConflict, ignoreDuplicates, select } = body as {
+    const { action, table, data, id, filters, order, rpc, rpcParams, onConflict, ignoreDuplicates } = body as {
       action: string;
       table?: string;
       data?: Record<string, unknown> | Record<string, unknown>[];
@@ -87,22 +37,11 @@ export async function POST(req: Request) {
       rpcParams?: Record<string, unknown>;
       onConflict?: string;
       ignoreDuplicates?: boolean;
-      select?: string;
     };
 
-    // Obtener user_id del usuario autenticado
-    const userId = await getUserId();
-    
-    // Para tablas con user_id, usar cliente con RLS (respeta políticas)
-    // Para otras tablas, usar admin client
-    const useUserClient = table && USER_SCOPED_TABLES.has(table);
-    const supa = (useUserClient && userId) ? await getSupaUser() : getSupaAdmin();
-    
-    if (!supa) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-    }
+    const supa = getSupa();
 
-    // RPC calls
+    // RPC calls (funciones almacenadas)
     if (action === "rpc" && rpc) {
       const { data: result, error } = await supa.rpc(rpc, rpcParams ?? {});
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -115,14 +54,8 @@ export async function POST(req: Request) {
 
     // SELECT
     if (action === "select") {
-      const selectFields = select ?? "*";
-      let q = supa.from(table).select(selectFields);
-      
-      // Auto-filtrar por user_id si la tabla lo requiere
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        q = q.eq("user_id", userId);
-      }
-      
+      const select = (body.select as string) ?? "*";
+      let q = supa.from(table).select(select);
       if (filters) {
         for (const f of filters) {
           if (f.op === "eq") q = q.eq(f.col, f.val);
@@ -133,7 +66,6 @@ export async function POST(req: Request) {
         }
       }
       if (order) q = q.order(order.col, { ascending: order.asc });
-      
       const maybeSingle = filters?.some(f => f.op === "maybeSingle");
       if (maybeSingle) {
         const { data: result, error } = await q.maybeSingle();
@@ -148,12 +80,6 @@ export async function POST(req: Request) {
     // SELECT SINGLE
     if (action === "selectSingle") {
       let q = supa.from(table).select("*");
-      
-      // Auto-filtrar por user_id
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        q = q.eq("user_id", userId);
-      }
-      
       if (filters) {
         for (const f of filters) {
           if (f.op === "eq") q = q.eq(f.col, f.val);
@@ -167,18 +93,7 @@ export async function POST(req: Request) {
     // INSERT
     if (action === "insert") {
       if (!data) return NextResponse.json({ error: "data requerido" }, { status: 400 });
-      
-      // Auto-agregar user_id si la tabla lo requiere
-      let finalData = data;
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        if (Array.isArray(data)) {
-          finalData = data.map(d => ({ ...d, user_id: userId }));
-        } else {
-          finalData = { ...data, user_id: userId };
-        }
-      }
-      
-      const { error } = await supa.from(table).insert(finalData);
+      const { error } = await supa.from(table).insert(data);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
@@ -186,21 +101,10 @@ export async function POST(req: Request) {
     // UPSERT
     if (action === "upsert") {
       if (!data) return NextResponse.json({ error: "data requerido" }, { status: 400 });
-      
-      // Auto-agregar user_id
-      let finalData = data;
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        if (Array.isArray(data)) {
-          finalData = data.map(d => ({ ...d, user_id: userId }));
-        } else {
-          finalData = { ...data, user_id: userId };
-        }
-      }
-      
       const opts: { onConflict?: string; ignoreDuplicates?: boolean } = {};
       if (onConflict) opts.onConflict = onConflict;
       if (ignoreDuplicates !== undefined) opts.ignoreDuplicates = ignoreDuplicates;
-      const { error } = await supa.from(table).upsert(finalData, opts);
+      const { error } = await supa.from(table).upsert(data, opts);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
@@ -209,15 +113,7 @@ export async function POST(req: Request) {
     if (action === "update") {
       if (!data || !id) return NextResponse.json({ error: "data e id requeridos" }, { status: 400 });
       const idCol = (body.idCol as string) ?? "id";
-      
-      let q = supa.from(table).update(data).eq(idCol, id);
-      
-      // Auto-filtrar por user_id para seguridad extra
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        q = q.eq("user_id", userId);
-      }
-      
-      const { error } = await q;
+      const { error } = await supa.from(table).update(data).eq(idCol, id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
@@ -226,29 +122,15 @@ export async function POST(req: Request) {
     if (action === "delete") {
       if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
       const idCol = (body.idCol as string) ?? "id";
-      
-      let q = supa.from(table).delete().eq(idCol, id);
-      
-      // Auto-filtrar por user_id para seguridad
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        q = q.eq("user_id", userId);
-      }
-      
-      const { error } = await q;
+      const { error } = await supa.from(table).delete().eq(idCol, id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
 
-    // DELETE con filtro custom
+    // DELETE con filtro custom (ej: delete venta_id = X)
     if (action === "deleteWhere") {
       if (!filters?.length) return NextResponse.json({ error: "filters requerido" }, { status: 400 });
       let q = supa.from(table).delete();
-      
-      // Auto-filtrar por user_id
-      if (USER_SCOPED_TABLES.has(table) && userId) {
-        q = q.eq("user_id", userId);
-      }
-      
       for (const f of filters) {
         if (f.op === "eq") q = q.eq(f.col, f.val);
       }
