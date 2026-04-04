@@ -773,6 +773,10 @@ export async function GET(req: Request) {
       }
     }
 
+    if (mergedPdf.getPageCount() === 0) {
+      return NextResponse.json({ error: "No se pudo generar el PDF: las etiquetas no están disponibles o MeLi no las devolvió correctamente." }, { status: 502 });
+    }
+
     const mergedBytes = await mergedPdf.save();
     const mergedBuffer = Buffer.from(mergedBytes);
 

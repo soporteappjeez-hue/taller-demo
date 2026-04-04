@@ -719,10 +719,15 @@ function EtiquetasInner() {
       // PASO 2: Generar PDF
       const ids = valid.join(",");
       const tzOffset = -new Date().getTimezoneOffset() / 60;
-      const pdfRes = await fetch(`/api/meli-labels?ids=${ids}&tz_offset=${tzOffset}`);
+      const pdfRes = await fetch(`/api/meli-labels?action=download&ids=${ids}&tz_offset=${tzOffset}`);
 
       if (!pdfRes.ok) {
-        throw new Error("Failed to generate PDF");
+        let errMsg = "Error al generar el PDF";
+        try {
+          const errData = await pdfRes.json();
+          if (errData?.error) errMsg = errData.error;
+        } catch { /* ignore */ }
+        throw new Error(errMsg);
       }
 
       const pdfBlob = await pdfRes.blob();
