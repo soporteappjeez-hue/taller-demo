@@ -18,6 +18,16 @@ const TYPE_COLORS: Record<string, string> = {
   correo: "bg-blue-500/20   text-blue-300   border-blue-500/40",
   turbo:  "bg-purple-500/20 text-purple-300 border-purple-500/40",
 };
+const TYPE_BG: Record<string, string> = {
+  flex:   "#FFE60015",
+  correo: "#3B82F615",
+  turbo:  "#A855F715",
+};
+const TYPE_BORDER: Record<string, string> = {
+  flex:   "#FFE60040",
+  correo: "#3B82F640",
+  turbo:  "#A855F740",
+};
 
 function timeUntilMidnight(): string {
   const now = new Date();
@@ -54,12 +64,6 @@ export default function PendientesPage() {
     clearPendientes();
     refresh();
   };
-
-  // Agrupar por tipo
-  const byType = (["flex", "correo", "turbo"] as const).map(t => ({
-    type: t,
-    items: items.filter(i => i.type === t),
-  })).filter(g => g.items.length > 0);
 
   return (
     <>
@@ -122,73 +126,103 @@ export default function PendientesPage() {
           </div>
         )}
 
-        {/* Lista agrupada por tipo */}
-        {byType.map(({ type, items: group }) => (
-          <div key={type} className="space-y-3">
-            <h2 className={`text-xs font-black uppercase tracking-widest px-1 flex items-center gap-2`}>
-              <Truck className="w-3.5 h-3.5" />
-              <span className={TYPE_COLORS[type].split(" ")[1]}>{TYPE_LABELS[type]}</span>
-              <span className="text-gray-600">— {group.length} envío{group.length !== 1 ? "s" : ""}</span>
-            </h2>
-
-            {group.map(item => (
-              <div
-                key={item.shipment_id}
-                className="bg-gray-800/60 rounded-2xl border border-gray-700 p-4 flex items-start gap-3"
-              >
-                {/* Thumbnail */}
-                {item.thumbnail ? (
-                  <Image
-                    src={item.thumbnail}
-                    alt={item.title}
-                    width={52}
-                    height={52}
-                    className="rounded-xl object-cover flex-shrink-0 bg-gray-700"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="w-[52px] h-[52px] rounded-xl bg-gray-700 flex items-center justify-center flex-shrink-0">
-                    <Package className="w-6 h-6 text-gray-500" />
-                  </div>
-                )}
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm leading-snug line-clamp-2">
-                    {item.title || "Sin título"}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                    {item.buyer_nickname && (
-                      <span className="text-gray-400 text-xs">@{item.buyer_nickname}</span>
-                    )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-bold ${TYPE_COLORS[item.type] ?? ""}`}>
-                      {TYPE_LABELS[item.type] ?? item.type}
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                      x{item.quantity}
-                    </span>
-                    {item.seller_sku && (
-                      <span className="text-gray-600 text-[10px] font-mono">SKU: {item.seller_sku}</span>
-                    )}
-                  </div>
-                  <p className="text-gray-600 text-[10px] mt-0.5 font-mono">
-                    ID: {item.shipment_id}
-                  </p>
-                </div>
-
-                {/* Botón entregado */}
-                <button
-                  onClick={() => handleEntregado(item.shipment_id)}
-                  className="flex-shrink-0 flex flex-col items-center gap-1 p-2 rounded-xl text-gray-600 hover:text-green-400 hover:bg-green-900/20 border border-transparent hover:border-green-700/40 transition-all"
-                  title="Marcar como entregado"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span className="text-[9px] font-bold">Listo</span>
-                </button>
+        {/* Lista agrupada por tipo — secciones independientes */}
+        {(["flex", "correo", "turbo"] as const).map(type => {
+          const group = items.filter(i => i.type === type);
+          if (group.length === 0) return null;
+          return (
+            <div key={type} className="mb-4 rounded-2xl overflow-hidden"
+              style={{ border: `2px solid ${TYPE_BORDER[type]}`, background: "#1a1a1a" }}>
+              {/* Header del tipo */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b"
+                style={{ borderColor: TYPE_BORDER[type], background: TYPE_BG[type] }}>
+                <span className={`text-xs font-black px-2.5 py-1 rounded-full ${TYPE_COLORS[type]}`}>
+                  {TYPE_LABELS[type]}
+                </span>
+                <span className="text-xs font-black px-2 py-0.5 rounded-full animate-pulse bg-red-500 text-white">
+                  PENDIENTES DE ENVÍO
+                </span>
+                <span className="text-[10px] font-bold text-gray-500 ml-auto">
+                  {group.length} {group.length === 1 ? "envío" : "envíos"} por despachar hoy
+                </span>
               </div>
-            ))}
-          </div>
-        ))}
+              {/* Lista */}
+              <div className="p-3 space-y-2">
+                {group.map(item => {
+                  const horaCompra = item.order_date
+                    ? new Date(item.order_date).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })
+                    : null;
+                  return (
+                    <div
+                      key={item.shipment_id}
+                      className="bg-gray-800/40 rounded-xl border border-gray-700/50 p-3 flex items-start gap-3"
+                    >
+                      {/* Thumbnail */}
+                      {item.thumbnail ? (
+                        <Image
+                          src={item.thumbnail}
+                          alt={item.title}
+                          width={56}
+                          height={56}
+                          className="rounded-lg object-cover flex-shrink-0 bg-gray-700"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0">
+                          <Package className="w-6 h-6 text-gray-500" />
+                        </div>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-bold ${TYPE_COLORS[item.type]}`}>
+                            {TYPE_LABELS[item.type]}
+                          </span>
+                          {/* Hora de compra bien visible */}
+                          {horaCompra && (
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-green-500 text-white">
+                              🕐 {horaCompra} hs
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-white font-semibold text-sm leading-snug line-clamp-2">
+                          {item.title || "Sin título"}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {item.buyer_nickname && (
+                            <span className="text-gray-400 text-xs">@{item.buyer_nickname}</span>
+                          )}
+                          <span className="text-gray-500 text-xs">x{item.quantity}</span>
+                          {item.seller_sku && (
+                            <span className="text-gray-600 text-[10px] font-mono">SKU: {item.seller_sku}</span>
+                          )}
+                        </div>
+                        <p className="text-gray-600 text-[10px] mt-0.5 font-mono">
+                          ID: {item.shipment_id}
+                        </p>
+                      </div>
+
+                      {/* Botón entregado */}
+                      <button
+                        onClick={() => handleEntregado(item.shipment_id)}
+                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 rounded-xl text-gray-600 hover:text-green-400 hover:bg-green-900/20 border border-transparent hover:border-green-700/40 transition-all"
+                        title="Marcar como entregado"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span className="text-[9px] font-bold">Listo</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </main>
       <BottomNav />
     </>

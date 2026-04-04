@@ -10,6 +10,7 @@ export interface PendienteEntrega {
   meli_user_id: string;
   seller_sku: string | null;
   thumbnail: string | null;
+  order_date: string | null; // ISO timestamp de la compra
   added_at: string; // ISO timestamp
   expires_at: string; // medianoche del día siguiente (00:00)
 }
