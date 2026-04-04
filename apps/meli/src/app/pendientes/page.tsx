@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { getPendientes, removePendiente, clearPendientes, PendienteEntrega } from "@/lib/pendientes";
-import { Package, CheckCircle2, Trash2, Truck, Clock, ShoppingBag } from "lucide-react";
+import { Package, CheckCircle2, Trash2, Truck, Clock, ShoppingBag, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -50,10 +50,19 @@ export default function PendientesPage() {
   const [items, setItems] = useState<PendienteEntrega[]>([]);
   const [timeLeft, setTimeLeft] = useState(timeUntilMidnight());
   const [filtroTipo, setFiltroTipo] = useState<TipoFiltro>("todas");
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {
-    setItems(getPendientes());
-    setTimeLeft(timeUntilMidnight());
+    setLoading(true);
+    try {
+      const list = getPendientes();
+      setItems(list);
+      setTimeLeft(timeUntilMidnight());
+    } catch (e) {
+      console.error("Error cargando pendientes:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -111,6 +120,14 @@ export default function PendientesPage() {
               Limpiar todo
             </button>
           )}
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="text-xs text-gray-500 hover:text-white transition-colors flex items-center gap-1 border border-gray-700 hover:border-gray-500 rounded-xl px-3 py-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Cargando..." : "Actualizar"}
+          </button>
         </div>
 
         {/* Filtros por tipo */}
@@ -162,8 +179,16 @@ export default function PendientesPage() {
           </div>
         )}
 
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-12 text-gray-500">
+            <RefreshCw className="w-8 h-8 mx-auto animate-spin mb-3" />
+            <p className="text-sm">Cargando pendientes...</p>
+          </div>
+        )}
+
         {/* Resumen */}
-        {items.length > 0 && filtroTipo === "todas" && (
+        {!loading && items.length > 0 && filtroTipo === "todas" && (
           <div className="grid grid-cols-3 gap-3">
             {(["flex","correo","turbo"] as const).map(t => {
               const count = items.filter(i => i.type === t).length;
@@ -179,7 +204,7 @@ export default function PendientesPage() {
         )}
 
         {/* Sin pendientes */}
-        {itemsFiltrados.length === 0 && (
+        {!loading && itemsFiltrados.length === 0 && (
           <div className="text-center py-20 text-gray-500 space-y-3">
             <CheckCircle2 className="w-14 h-14 mx-auto opacity-20" />
             <p className="font-semibold text-lg">
@@ -200,7 +225,8 @@ export default function PendientesPage() {
         )}
 
         {/* Lista agrupada por tipo — secciones independientes */}
-        {(filtroTipo === "todas" ? (["flex", "correo", "turbo"] as const) : [filtroTipo])
+        {!loading &&
+          (filtroTipo === "todas" ? (["flex", "correo", "turbo"] as const) : [filtroTipo])
           .map(type => {
             const group = items.filter(i => i.type === type);
             if (group.length === 0) return null;
